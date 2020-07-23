@@ -44,30 +44,33 @@ summary(asm)
 The worksheet is organized in a "long" format, convenient to work with `dplyr` and `ggplot2` paradigm. If wide tables are needed, simply filter and reshape it.
 
 ```{r}
-names(asm)
+new_names <- c('program', 'plo', 'orientation', 'type', 'ay', 'group', 'n', 'outcome', 'unit', 'target', 'goal', 'source', 'note')
+asm_names <- names(asm)
+names(asm_names) <- new_names # Make it into a dictionary
+names(asm) <- new_names
 ```
 
 ```{r}
-asm %>% group_by(Program, `Assessment Type Orientation`, `Assessment Type`) %>% summarise(n = n(), n_PLO = n_distinct(`Learning Objective Number`), n_target = n_distinct(`Target Student Group`)) %>% knitr::kable()
+asm %>% group_by(program, orientation, type) %>% summarise(n = n(), n_PLO = n_distinct(plo), n_target = n_distinct(group)) %>% knitr::kable()
 ```
 
 ```{r}
-x <- asm %>% filter(Program == "Accounting",
-                    `Learning Objective Number` == 1,
-                    `Assessment Type Orientation` == "External",
-                    `Assessment Type` == "Summative",
-                    `Target Student Group` != "All")
+x <- asm %>% filter(program == "Accounting",
+                    plo == 1,
+                    orientation == "External",
+                    type == "Summative",
+                    group == "All")
 
-ymin <- min(x$Outcome - 0.1, x$`Outcome Goal` - 0.1, na.rm = TRUE)
-p <- ggplot(x, aes(`Academic Year`, Outcome)) +
+ymin <- min(x$outcome - 0.1, x$target - 0.1, na.rm = TRUE)
+p <- ggplot(x, aes(ay, outcome)) +
   geom_line(na.rm = TRUE) +
   geom_point(na.rm = TRUE) +
-  geom_text(aes(`Academic Year`, ymin + 0.05, label = round(`Sample Size`, 0)),
+  geom_text(aes(ay, ymin + 0.05, label = round(n, 0)),
             alpha = 0.4, na.rm = TRUE) +
-  geom_hline(aes(yintercept = `Outcome Goal`),
+  geom_hline(aes(yintercept = target),
              alpha = 0.4, color = "red", na.rm = TRUE) +
   scale_y_continuous(labels=scales::percent, limits = c(ymin, 1.01))
-
+p
 #p + facet_wrap(vars(`Learning Objective Number`)) +
 #  labs(title = title, caption = caption) +
 #  theme(axis.title = element_blank(),
@@ -76,4 +79,22 @@ p <- ggplot(x, aes(`Academic Year`, Outcome)) +
 #        legend.position = "none")
 ```
 
+Moreover, updated the mapping worksheet.
+```{r}
+asm_map <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Mapping")
+head(asm_map)
+```
+
+```{r}
+y <- asm_map %>% filter(program == "Accounting",
+                    plo == "ACC 1",
+                    type == "Summative")
+y %>% select(description, course, external_tool, external_goal_description)
+```
+
+Hmm. Not symmetric between those worksheets. Data treats "external" vs "internal" as a category. Mapping treats them as different set of rows. I developed the latter to minimize the duplicated PLO rows, but... rows are not uniquely identified anyway.
+
+A totally 'long' format is nice, but I won't deal with them in the same level. Meanwhile, I may want to correlate them in scatter plots. That implies I'm treating those two as distinctively different measures.
+
+Okay, let's restructure the datasheet.
 
