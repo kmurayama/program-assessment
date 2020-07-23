@@ -36,9 +36,44 @@ Set up
 ================================================================================
 Data are semi-manually input from `external-direct-assessment` and `internal-direct-assessment` projects into the main Excel file. Use it as a database here.
 ```{r}
-path <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+path <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\WIP\\"
 asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Main")
 summary(asm)
 ```
 
 The worksheet is organized in a "long" format, convenient to work with `dplyr` and `ggplot2` paradigm. If wide tables are needed, simply filter and reshape it.
+
+```{r}
+names(asm)
+```
+
+```{r}
+asm %>% group_by(Program, `Assessment Type Orientation`, `Assessment Type`) %>% summarise(n = n(), n_PLO = n_distinct(`Learning Objective Number`), n_target = n_distinct(`Target Student Group`)) %>% knitr::kable()
+```
+
+```{r}
+x <- asm %>% filter(Program == "Accounting",
+                    `Learning Objective Number` == 1,
+                    `Assessment Type Orientation` == "External",
+                    `Assessment Type` == "Summative",
+                    `Target Student Group` != "All")
+
+ymin <- min(x$Outcome - 0.1, x$`Outcome Goal` - 0.1, na.rm = TRUE)
+p <- ggplot(x, aes(`Academic Year`, Outcome)) +
+  geom_line(na.rm = TRUE) +
+  geom_point(na.rm = TRUE) +
+  geom_text(aes(`Academic Year`, ymin + 0.05, label = round(`Sample Size`, 0)),
+            alpha = 0.4, na.rm = TRUE) +
+  geom_hline(aes(yintercept = `Outcome Goal`),
+             alpha = 0.4, color = "red", na.rm = TRUE) +
+  scale_y_continuous(labels=scales::percent, limits = c(ymin, 1.01))
+
+#p + facet_wrap(vars(`Learning Objective Number`)) +
+#  labs(title = title, caption = caption) +
+#  theme(axis.title = element_blank(),
+#        text = element_text(family = "serif"),
+#        panel.grid.minor.x = element_blank(),
+#        legend.position = "none")
+```
+
+
