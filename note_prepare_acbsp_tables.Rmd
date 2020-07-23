@@ -1,0 +1,44 @@
+---
+title: "Note to Produce ACBSP Standard 4 Items"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_notebook:
+    toc: yes
+    toc_float:
+      collapsed: yes
+    code_folding: hide
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+    df_print: paged
+    code_folding: hide
+    fig_height: 7
+    fig_width: 7
+---
+
+```{r, echo=FALSE, include=FALSE}
+#knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+```
+
+Objective
+================================================================================
+It makes more sense to produce graphs and other items for ACBSP Standard 4 tables using the database, rather than using partial tables of `internal direct assessment` project. Hence, here it is.
+Standard 4 "Fig 4.1" requires descriptions of PLOs, which are readily available in the dtabase file ("Mapping" tab). "Fig 4.2" requires outcomes of those PLOs.
+
+- Create tables with multiple (3-5) data points, *separately* for each objective.
+- As much possible, accompany them with sufficient information.
+
+Set up
+================================================================================
+Data are semi-manually input from `external-direct-assessment` and `internal-direct-assessment` projects into the main Excel file. Use it as a database here.
+```{r}
+path <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Main")
+summary(asm)
+```
+
+The worksheet is organized in a "long" format, convenient to work with `dplyr` and `ggplot2` paradigm. If wide tables are needed, simply filter and reshape it.
