@@ -85,7 +85,8 @@ asm_map <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Mapping")
 head(asm_map)
 ```
 
-```{r}
+```{r, eval=FALSE}
+# No longer valid. Skip this.
 y <- asm_map %>% filter(program == "Accounting",
                     plo == "ACC 1",
                     type == "Summative")
@@ -97,4 +98,41 @@ Hmm. Not symmetric between those worksheets. Data treats "external" vs "internal
 A totally 'long' format is nice, but I won't deal with them in the same level. Meanwhile, I may want to correlate them in scatter plots. That implies I'm treating those two as distinctively different measures.
 
 Okay, let's restructure the datasheet.
+
+```{r}
+asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Sheet0")
+summary(asm)
+```
+
+
+```{r}
+names(asm)
+asm %>% group_by(program, type) %>% summarise(n = n(), n_PLO = n_distinct(plo), n_group_int = n_distinct(internal_group), n_group_ext = n_distinct(external_group)) %>% knitr::kable()
+```
+
+
+```{r}
+table(asm$internal_group)
+x <- asm %>% filter(plo == "ACC 1",
+                    type == "Summative")
+x
+ymin <- min(x$internal_outcome - 0.1, x$internal_target - 0.1,
+            na.rm = TRUE)
+p <- ggplot(x, aes(ay, internal_outcome)) +
+  geom_line(na.rm = TRUE) +
+  geom_point(na.rm = TRUE) +
+  geom_text(aes(ay, ymin + 0.05, label = round(internal_n, 0)),
+            alpha = 0.4, na.rm = TRUE) +
+  geom_hline(aes(yintercept = internal_target),
+             alpha = 0.4, color = "red", na.rm = TRUE) +
+  scale_y_continuous(labels=scales::percent, limits = c(ymin, 1.01))
+p
+#p + facet_wrap(vars(`Learning Objective Number`)) +
+#  labs(title = title, caption = caption) +
+#  theme(axis.title = element_blank(),
+#        text = element_text(family = "serif"),
+#        panel.grid.minor.x = element_blank(),
+#        legend.position = "none")
+```
+
 
