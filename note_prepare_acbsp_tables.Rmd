@@ -149,17 +149,32 @@ x
 ```{r}
 lx <- list()
 lp <- list()
+
+orientation <- "Internal"
+
 for(i in 1:nrow(asm_map)){
   i_plo <- asm_map$plo[[i]]
   i_type <- asm_map$type[[i]]
+  if(orientation == "Internal"){i_tool <- asm_map$internal_tool}
+  if(orientation == "External"){i_tool <- asm_map$external_tool}
+  
+  title <- paste(asm_map[i, c("plo", "type")], collapse = " ")
+  subtitle <- paste("Assessment Tool:", i_tool)
+  
   x <- asm %>% filter(plo == i_plo, type == i_type) 
-  lx[[paste(i_plo, i_type)]] <- x
-  lp[[paste(i_plo, i_type)]] <- draw_graph(x, "Internal")
+  if (nrow(x)!=0){
+    lx[[paste(i_plo, i_type)]] <- x
+    p <- draw_graph(x, orientation)
+    if (!is.null(p)){
+      p <- p + labs(title = title, subtitle = subtitle) +
+        ylab("Outcome (%)") + xlab("Academic Year\nSample Size")
+    }
+    lp[[paste(i_plo, i_type)]] <- p
+  }
 }
 ```
 
 ```{r}
-lx[[1]]
-lp[[1]]
+sapply(lp, print)
 ```
 
