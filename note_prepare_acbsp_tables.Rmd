@@ -116,8 +116,11 @@ asm %>% group_by(program, type) %>% summarise(n = n(), n_PLO = n_distinct(plo), 
 ```{r}
 asm <- asm %>% mutate(ay_internal_n = paste0(ay, '\nN = ', internal_n), 
                       ay_external_n = paste0(ay, '\nN = ', external_n))
-x <- asm %>% filter(plo == "ACC 1", type == "Summative") 
-      
+x <- asm %>% filter(plo == "ACC 1", type == "Summative")
+```
+
+
+```{r}
 draw_graph <- function(x, orientation){
   if(nrow(x) == 0){return(NULL)}
   if(orientation == "Internal"){
@@ -138,55 +141,8 @@ draw_graph <- function(x, orientation){
     geom_point(na.rm = TRUE) +
     geom_hline(aes_string(yintercept = target),
                alpha = 0.4, color = "red", na.rm = TRUE) +
-    scale_y_continuous(labels=scales::percent)
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
   p
-}
-draw_graph(x, "Internal")
-draw_graph(x, "External")
-x
-```
-
-```{r}
-lx <- list()
-
-for(i in 1:nrow(asm_map)){
-  i_plo <- asm_map$plo[[i]]
-  i_type <- asm_map$type[[i]]
-  int_tool <- asm_map$internal_tool[[i]]
-  ext_tool <- asm_map$external_tool[[i]]
-  
-  int_title <- paste(asm_map[i, c("plo", "type")], "Internal", collapse = " ")
-  ext_title <- paste(asm_map[i, c("plo", "type")], "External", collapse = " ")
-  int_subtitle <- paste("Assessment Tool:", int_tool)
-  ext_subtitle <- paste("Assessment Tool:", ext_tool)
-  
-  x <- asm %>% filter(plo == i_plo, type == i_type) 
-  if (nrow(x)!=0){
-    lx[[paste(i_plo, i_type)]] <-
-      list("table" = x, 
-           "int_title" = int_title, "ext_title" = ext_title,
-           "int_subtitle" = int_subtitle, "ext_subtitle" = ext_subtitle)
-  }
-}
-```
-
-
-```{r}
-lp <- list()
-for(x in lx){
-  if(x$int_subtitle != "Assessment Tool: NA"){
-    p <- draw_graph(x$table, "Internal")
-    p <- p + labs(title = x$int_title, subtitle = x$int_subtitle) +
-      ylab("Outcome (%)") + xlab("Academic Year\nSample Size")
-    lp[[x$int_title]] <- p
-  }
-  
-  if(x$ext_subtitle != "Assessment Tool: NA"){
-    p <- draw_graph(x$table, "External")
-    p <- p + labs(title = x$int_title, subtitle = x$ext_subtitle) +
-      ylab("Outcome (%)") + xlab("Academic Year\nSample Size")
-    lp[[x$ext_title]] <- p
-  }
 }
 ```
 
@@ -212,7 +168,9 @@ draw_from_mapping <- function(plo_map){
     if(int_tool != "NA"){
       int_p <- draw_graph(x, "Internal")
       int_p <- int_p + labs(title = int_title, subtitle = int_subtitle) +
-        ylab("Outcome (%)") + xlab("Academic Year\nSample Size")
+        ylab("Outcome") + xlab("Academic Year\nSample Size") +
+        theme(plot.subtitle = element_text(size = 7)) +
+        theme_minimal()
     } else{
       int_p <- NULL
     }
@@ -220,7 +178,9 @@ draw_from_mapping <- function(plo_map){
     if(ext_tool != "NA"){
       ext_p <- draw_graph(x, "External")
       ext_p <- ext_p + labs(title = int_title, subtitle = ext_subtitle) +
-        ylab("Outcome (%)") + xlab("Academic Year\nSample Size")
+        ylab("Outcome") + xlab("Academic Year\nSample Size") +
+        theme(plot.subtitle = element_text(size = 7)) +
+        theme_minimal()
     } else{
       ext_p <- NULL
     }
@@ -238,21 +198,20 @@ lp_int <- list()
 lp_ext <- list()
 for(i in 1:nrow(asm_map)){
   out <- draw_from_mapping(asm_map[i, ])
-  lx[[i]] <- out[[1]]
-  lp_int[[i]] <- out[[2]]
-  lp_ext[[i]] <- out[[3]]
+  if(!is.null(out)){
+    nm <- names(out[1])
+    lx[[nm]] <- out[[1]]
+    lp_int[[nm]] <- out[[2]]
+    lp_ext[[nm]] <- out[[3]]
+  }
 }
 ```
-
-
-```{r}
-asm_map[1,]
-lx[[1]]
-lp[[1]] + theme_minimal()
-```
-
 ```{r, eval=FALSE}
-lapply(names(lp),
-       function(x) ggsave(paste0("fig/", x, ".png"), lp[[x]]))
+lapply(names(lp_int),
+       function(x) ggsave(paste0("fig/", x, "_int.png"), lp_int[[x]],
+                          height = 4, width = 7, units = "in"))
+lapply(names(lp_ext),
+       function(x) ggsave(paste0("fig/", x, "_ext.png"), lp_ext[[x]],
+                          height = 4, width = 7, units = "in"))
 ```
 
