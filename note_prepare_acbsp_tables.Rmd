@@ -148,41 +148,107 @@ x
 
 ```{r}
 lx <- list()
-lp <- list()
 
-# ToDo: Internal/External doesn't matter for table stage
 for(i in 1:nrow(asm_map)){
   i_plo <- asm_map$plo[[i]]
   i_type <- asm_map$type[[i]]
   int_tool <- asm_map$internal_tool[[i]]
   ext_tool <- asm_map$external_tool[[i]]
   
-  title <- paste(asm_map[i, c("plo", "type")], collapse = " ")
+  int_title <- paste(asm_map[i, c("plo", "type")], "Internal", collapse = " ")
+  ext_title <- paste(asm_map[i, c("plo", "type")], "External", collapse = " ")
   int_subtitle <- paste("Assessment Tool:", int_tool)
   ext_subtitle <- paste("Assessment Tool:", ext_tool)
   
   x <- asm %>% filter(plo == i_plo, type == i_type) 
   if (nrow(x)!=0){
     lx[[paste(i_plo, i_type)]] <-
-      list("table" = x, "title" = title,
+      list("table" = x, 
+           "int_title" = int_title, "ext_title" = ext_title,
            "int_subtitle" = int_subtitle, "ext_subtitle" = ext_subtitle)
   }
 }
+```
+
+
+```{r}
+lp <- list()
 for(x in lx){
   if(x$int_subtitle != "Assessment Tool: NA"){
     p <- draw_graph(x$table, "Internal")
-    p <- p + labs(title = x$title, subtitle = x$int_subtitle) +
+    p <- p + labs(title = x$int_title, subtitle = x$int_subtitle) +
       ylab("Outcome (%)") + xlab("Academic Year\nSample Size")
-    lp[[paste(x$title, "Internal")]] <- p
+    lp[[x$int_title]] <- p
   }
   
   if(x$ext_subtitle != "Assessment Tool: NA"){
     p <- draw_graph(x$table, "External")
-    p <- p + labs(title = x$title, subtitle = x$ext_subtitle) +
+    p <- p + labs(title = x$int_title, subtitle = x$ext_subtitle) +
       ylab("Outcome (%)") + xlab("Academic Year\nSample Size")
-    lp[[paste(x$title, "External")]] <- p
+    lp[[x$ext_title]] <- p
   }
 }
+```
+
+```{r}
+draw_from_mapping <- function(plo_map){
+  i_plo <- plo_map$plo
+  i_type <- plo_map$type
+  int_tool <- plo_map$internal_tool
+  ext_tool <- plo_map$external_tool
+  
+  # Make titles
+  title <- paste(i_plo, i_type, collapse = " ")
+  int_title <- paste(title, "Internal", collapse = " ")
+  ext_title <- paste(title, "External", collapse = " ")
+  int_subtitle <- paste("Assessment Tool:", int_tool)
+  ext_subtitle <- paste("Assessment Tool:", ext_tool)
+  
+  # Draw subsample from the dataset
+  x <- asm %>% filter(plo == i_plo, type == i_type) 
+  # Check for empty cases, then make plot(s)
+  if (nrow(x)!=0){
+    # Check for empty cases (PLO can have internal or external or both)
+    if(int_tool != "NA"){
+      int_p <- draw_graph(x, "Internal")
+      int_p <- int_p + labs(title = int_title, subtitle = int_subtitle) +
+        ylab("Outcome (%)") + xlab("Academic Year\nSample Size")
+    } else{
+      int_p <- NULL
+    }
+    
+    if(ext_tool != "NA"){
+      ext_p <- draw_graph(x, "External")
+      ext_p <- ext_p + labs(title = int_title, subtitle = ext_subtitle) +
+        ylab("Outcome (%)") + xlab("Academic Year\nSample Size")
+    } else{
+      ext_p <- NULL
+    }
+    out <- list(x, int_p, ext_p)
+    names(out) <- c(title, int_subtitle, ext_subtitle)
+    return(out)
+  } else{
+    return(NULL)
+  }
+}
+```
+```{r}
+lx <- list()
+lp_int <- list()
+lp_ext <- list()
+for(i in 1:nrow(asm_map)){
+  out <- draw_from_mapping(asm_map[i, ])
+  lx[[i]] <- out[[1]]
+  lp_int[[i]] <- out[[2]]
+  lp_ext[[i]] <- out[[3]]
+}
+```
+
+
+```{r}
+asm_map[1,]
+lx[[1]]
+lp[[1]] + theme_minimal()
 ```
 
 ```{r, eval=FALSE}
