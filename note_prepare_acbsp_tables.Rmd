@@ -119,6 +119,7 @@ asm <- asm %>% mutate(ay_internal_n = paste0(ay, '\nN = ', internal_n),
 x <- asm %>% filter(plo == "ACC 1", type == "Summative") 
       
 draw_graph <- function(x, orientation){
+  if(nrow(x) == 0){return(NULL)}
   if(orientation == "Internal"){
     ay <- "ay_internal_n"
     outcome <- "internal_outcome"
@@ -146,10 +147,19 @@ x
 ```
 
 ```{r}
-asm_map$plo
-x <- asm %>% filter(plo == "ACC 1",
-                    type == "Formative")
-x
+lx <- list()
+lp <- list()
+for(i in 1:nrow(asm_map)){
+  i_plo <- asm_map$plo[[i]]
+  i_type <- asm_map$type[[i]]
+  x <- asm %>% filter(plo == i_plo, type == i_type) 
+  lx[[paste(i_plo, i_type)]] <- x
+  lp[[paste(i_plo, i_type)]] <- draw_graph(x, "Internal")
+}
 ```
 
+```{r}
+lx[[1]]
+lp[[1]]
+```
 
