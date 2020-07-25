@@ -151,30 +151,33 @@ lx <- list()
 lp <- list()
 
 orientation <- "Internal"
+orientation <- "External"
 
+# ToDo: Internal/External doesn't matter for table stage
 for(i in 1:nrow(asm_map)){
   i_plo <- asm_map$plo[[i]]
   i_type <- asm_map$type[[i]]
-  if(orientation == "Internal"){i_tool <- asm_map$internal_tool}
-  if(orientation == "External"){i_tool <- asm_map$external_tool}
+  if(orientation == "Internal"){i_tool <- asm_map$internal_tool[[i]]}
+  if(orientation == "External"){i_tool <- asm_map$external_tool[[i]]}
   
   title <- paste(asm_map[i, c("plo", "type")], collapse = " ")
   subtitle <- paste("Assessment Tool:", i_tool)
   
   x <- asm %>% filter(plo == i_plo, type == i_type) 
   if (nrow(x)!=0){
-    lx[[paste(i_plo, i_type)]] <- x
-    p <- draw_graph(x, orientation)
-    if (!is.null(p)){
-      p <- p + labs(title = title, subtitle = subtitle) +
-        ylab("Outcome (%)") + xlab("Academic Year\nSample Size")
-    }
-    lp[[paste(i_plo, i_type)]] <- p
+    lx[[paste(i_plo, i_type)]] <- list("table" = x, "title" = title, "subtitle" = subtitle)
   }
+}
+for(x in lx){
+  p <- draw_graph(x$table, orientation)
+  p <- p + labs(title = x$title, subtitle = x$subtitle) +
+    ylab("Outcome (%)") + xlab("Academic Year\nSample Size")
+  lp[[x$title]] <- p
 }
 ```
 
-```{r}
+```{r, eval=FALSE}
 sapply(lp, print)
+lx[["MBA 5 Formative"]][["table"]]
 ```
 
