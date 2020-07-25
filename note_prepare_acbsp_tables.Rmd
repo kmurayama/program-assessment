@@ -186,7 +186,7 @@ for(x in lx){
 ```
 
 ```{r, eval=FALSE}
-names(lp)
-sapply(lp, print)
+lapply(names(lp),
+       function(x) ggsave(paste0("fig/", x, ".png"), lp[[x]]))
 ```
 
