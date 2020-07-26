@@ -121,7 +121,8 @@ x <- asm %>% filter(plo == "ACC 1", type == "Summative")
 
 
 ```{r}
-draw_graph <- function(x, orientation){
+draw_graph <- function(x, orientation,
+                       title, subtitle){
   if(nrow(x) == 0){return(NULL)}
   if(orientation == "Internal"){
     ay <- "ay_internal_n"
@@ -142,6 +143,9 @@ draw_graph <- function(x, orientation){
     geom_hline(aes_string(yintercept = target),
                alpha = 0.4, color = "red", na.rm = TRUE) +
     scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p <- p +
+    labs(title = title, subtitle = subtitle) +
+    ylab("Outcome") + xlab("Academic Year\nSample Size")
   p
 }
 ```
@@ -163,26 +167,17 @@ draw_from_mapping <- function(plo_map){
   # Draw subsample from the dataset
   x <- asm %>% filter(plo == i_plo, type == i_type) 
   # Check for empty cases, then make plot(s)
+  int_p <- NULL
+  ext_p <- NULL
   if (nrow(x)!=0){
     # Check for empty cases (PLO can have internal or external or both)
     if(int_tool != "NA"){
-      int_p <- draw_graph(x, "Internal")
-      int_p <- int_p + labs(title = int_title, subtitle = int_subtitle) +
-        ylab("Outcome") + xlab("Academic Year\nSample Size") +
-        theme(plot.subtitle = element_text(size = 7)) +
-        theme_minimal()
-    } else{
-      int_p <- NULL
+      int_p <- draw_graph(x, "Internal", int_title, int_subtitle)
+      int_p <- int_p + ggthemes::theme_fivethirtyeight(base_size = 8)
     }
-    
     if(ext_tool != "NA"){
-      ext_p <- draw_graph(x, "External")
-      ext_p <- ext_p + labs(title = int_title, subtitle = ext_subtitle) +
-        ylab("Outcome") + xlab("Academic Year\nSample Size") +
-        theme(plot.subtitle = element_text(size = 7)) +
-        theme_minimal()
-    } else{
-      ext_p <- NULL
+      ext_p <- draw_graph(x, "External", ext_title, ext_subtitle)
+      ext_p <- ext_p + ggthemes::theme_fivethirtyeight(base_size = 8)
     }
     out <- list(x, int_p, ext_p)
     names(out) <- c(title, int_subtitle, ext_subtitle)
@@ -207,11 +202,16 @@ for(i in 1:nrow(asm_map)){
 }
 ```
 ```{r, eval=FALSE}
+lp_int[[11]] + ggthemes::theme_fivethirtyeight()
+ggsave("test.png", lp_int[[11]], height = 2, width = 3.5, units = "in")
+```
+
+```{r, eval=FALSE}
 lapply(names(lp_int),
        function(x) ggsave(paste0("fig/", x, "_int.png"), lp_int[[x]],
-                          height = 4, width = 7, units = "in"))
+                          height = 2, width = 3.5, units = "in"))
 lapply(names(lp_ext),
        function(x) ggsave(paste0("fig/", x, "_ext.png"), lp_ext[[x]],
-                          height = 4, width = 7, units = "in"))
+                          height = 2, width = 3.5, units = "in"))
 ```
 
