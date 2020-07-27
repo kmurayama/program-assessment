@@ -32,74 +32,12 @@ Standard 4 "Fig 4.1" requires descriptions of PLOs, which are readily available 
 - Create tables with multiple (3-5) data points, *separately* for each objective.
 - As much possible, accompany them with sufficient information.
 
-Set up
-================================================================================
-Data are semi-manually input from `external-direct-assessment` and `internal-direct-assessment` projects into the main Excel file. Use it as a database here.
-```{r}
-path <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\WIP\\"
-asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Main")
-summary(asm)
-```
-
-The worksheet is organized in a "long" format, convenient to work with `dplyr` and `ggplot2` paradigm. If wide tables are needed, simply filter and reshape it.
-
-```{r}
-new_names <- c('program', 'plo', 'orientation', 'type', 'ay', 'group', 'n', 'outcome', 'unit', 'target', 'goal', 'source', 'note')
-asm_names <- names(asm)
-names(asm_names) <- new_names # Make it into a dictionary
-names(asm) <- new_names
-```
-
-```{r}
-asm %>% group_by(program, orientation, type) %>% summarise(n = n(), n_PLO = n_distinct(plo), n_target = n_distinct(group)) %>% knitr::kable()
-```
-
-```{r}
-x <- asm %>% filter(program == "Accounting",
-                    plo == 1,
-                    orientation == "External",
-                    type == "Summative",
-                    group == "All")
-
-ymin <- min(x$outcome - 0.1, x$target - 0.1, na.rm = TRUE)
-p <- ggplot(x, aes(ay, outcome)) +
-  geom_line(na.rm = TRUE) +
-  geom_point(na.rm = TRUE) +
-  geom_text(aes(ay, ymin + 0.05, label = round(n, 0)),
-            alpha = 0.4, na.rm = TRUE) +
-  geom_hline(aes(yintercept = target),
-             alpha = 0.4, color = "red", na.rm = TRUE) +
-  scale_y_continuous(labels=scales::percent, limits = c(ymin, 1.01))
-p
-#p + facet_wrap(vars(`Learning Objective Number`)) +
-#  labs(title = title, caption = caption) +
-#  theme(axis.title = element_blank(),
-#        text = element_text(family = "serif"),
-#        panel.grid.minor.x = element_blank(),
-#        legend.position = "none")
-```
-
-Moreover, updated the mapping worksheet.
+Data Update
+--------------------------------------------------------------------------------
 ```{r}
 asm_map <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Mapping")
 head(asm_map)
 ```
-
-```{r, eval=FALSE}
-# No longer valid. Skip this.
-y <- asm_map %>% filter(program == "Accounting",
-                    plo == "ACC 1",
-                    type == "Summative")
-y %>% select(description, course, external_tool, external_goal_description)
-```
-
-Hmm. Not symmetric between those worksheets. Data treats "external" vs "internal" as a category. Mapping treats them as different set of rows. I developed the latter to minimize the duplicated PLO rows, but... rows are not uniquely identified anyway.
-
-A totally 'long' format is nice, but I won't deal with them in the same level. Meanwhile, I may want to correlate them in scatter plots. That implies I'm treating those two as distinctively different measures.
-
-Data Update
---------------------------------------------------------------------------------
-Okay, let's restructure the datasheet.
 
 ```{r}
 asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Sheet0")
