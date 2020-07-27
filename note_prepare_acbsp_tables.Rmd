@@ -32,32 +32,27 @@ Standard 4 "Fig 4.1" requires descriptions of PLOs, which are readily available 
 - Create tables with multiple (3-5) data points, *separately* for each objective.
 - As much possible, accompany them with sufficient information.
 
-Data Update
---------------------------------------------------------------------------------
-```{r}
-asm_map <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Mapping")
-head(asm_map)
-```
-
+Data
+================================================================================
+Main data file has been updated. Now the mapping worksheet separates internal and external assessments, aligned wit the data worksheet.
 ```{r}
 asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Sheet0")
-summary(asm)
+asm_map <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Mapping")
 ```
 
+Visualize
+================================================================================
+ACBSP Tables
+--------------------------------------------------------------------------------
+Create tables for ACBSP reporting.
 
-```{r}
-names(asm)
-asm %>% group_by(program, type) %>% summarise(n = n(), n_PLO = n_distinct(plo), n_group_int = n_distinct(internal_group), n_group_ext = n_distinct(external_group)) %>% knitr::kable()
-```
-
-
+In order to include sample sizes clearly, relabel the x-axis (Academic Year) to include sample sizes. Create new variables that have both the academic year and samples for each observation.
 ```{r}
 asm <- asm %>% mutate(ay_internal_n = paste0(ay, '\nN = ', internal_n), 
                       ay_external_n = paste0(ay, '\nN = ', external_n))
-x <- asm %>% filter(plo == "ACC 1", type == "Summative")
 ```
 
-
+Set up a template for graph.
 ```{r}
 draw_graph <- function(x, orientation,
                        title, subtitle){
@@ -86,9 +81,6 @@ draw_graph <- function(x, orientation,
     ylab("Outcome") + xlab("Academic Year\nSample Size")
   p
 }
-```
-
-```{r}
 draw_from_mapping <- function(plo_map){
   i_plo <- plo_map$plo
   i_type <- plo_map$type
@@ -125,6 +117,8 @@ draw_from_mapping <- function(plo_map){
   }
 }
 ```
+
+Then, draw graphs.
 ```{r}
 lx <- list()
 lp_int <- list()
@@ -139,12 +133,13 @@ for(i in 1:nrow(asm_map)){
   }
 }
 ```
+
+Finally, save the graphs. Keep those chunks `eval=FALSE` for usual runs. Execute them as needed.
 ```{r, eval=FALSE}
 lp_int[[11]] + ggthemes::theme_fivethirtyeight()
 ggsave("test.png", lp_int[[11]], height = 2, width = 3.5, units = "in")
 ```
-
-```{r, eval=FALSE}
+```{r, eval=FALSE, include=FALSE}
 lapply(names(lp_int),
        function(x) ggsave(paste0("fig/", x, "_int.png"), lp_int[[x]],
                           height = 2, width = 3.5, units = "in"))
@@ -152,4 +147,7 @@ lapply(names(lp_ext),
        function(x) ggsave(paste0("fig/", x, "_ext.png"), lp_ext[[x]],
                           height = 2, width = 3.5, units = "in"))
 ```
+
+Next
+================================================================================
 
