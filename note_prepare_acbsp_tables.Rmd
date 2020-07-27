@@ -27,7 +27,7 @@ library(readxl)
 Objective
 ================================================================================
 It makes more sense to produce graphs and other items for ACBSP Standard 4 tables using the database, rather than using partial tables of `internal direct assessment` project. Hence, here it is.
-Standard 4 "Fig 4.1" requires descriptions of PLOs, which are readily available in the dtabase file ("Mapping" tab). "Fig 4.2" requires outcomes of those PLOs.
+Standard 4 "Fig 4.1" requires descriptions of PLOs, which are readily available in the database file ("Mapping" tab). "Fig 4.2" requires outcomes of those PLOs.
 
 - Create tables with multiple (3-5) data points, *separately* for each objective.
 - As much possible, accompany them with sufficient information.
@@ -36,6 +36,7 @@ Data
 ================================================================================
 Main data file has been updated. Now the mapping worksheet separates internal and external assessments, aligned wit the data worksheet.
 ```{r}
+path <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\WIP\\"
 asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Sheet0")
 asm_map <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Mapping")
 ```
