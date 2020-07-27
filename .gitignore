@@ -6,3 +6,5 @@ data/*
 !data/README.md
 *docx
 *html
+
+fig/*

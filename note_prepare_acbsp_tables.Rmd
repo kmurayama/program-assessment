@@ -1,0 +1,153 @@
+---
+title: "Note to Produce ACBSP Standard 4 Items"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_notebook:
+    toc: yes
+    toc_float:
+      collapsed: yes
+    code_folding: hide
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+    df_print: paged
+    code_folding: hide
+    fig_height: 7
+    fig_width: 7
+---
+
+```{r, echo=FALSE, include=FALSE}
+#knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+```
+
+Objective
+================================================================================
+It makes more sense to produce graphs and other items for ACBSP Standard 4 tables using the database, rather than using partial tables of `internal direct assessment` project. Hence, here it is.
+Standard 4 "Fig 4.1" requires descriptions of PLOs, which are readily available in the dtabase file ("Mapping" tab). "Fig 4.2" requires outcomes of those PLOs.
+
+- Create tables with multiple (3-5) data points, *separately* for each objective.
+- As much possible, accompany them with sufficient information.
+
+Data
+================================================================================
+Main data file has been updated. Now the mapping worksheet separates internal and external assessments, aligned wit the data worksheet.
+```{r}
+asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Sheet0")
+asm_map <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Mapping")
+```
+
+Visualize
+================================================================================
+ACBSP Tables
+--------------------------------------------------------------------------------
+Create tables for ACBSP reporting.
+
+In order to include sample sizes clearly, relabel the x-axis (Academic Year) to include sample sizes. Create new variables that have both the academic year and samples for each observation.
+```{r}
+asm <- asm %>% mutate(ay_internal_n = paste0(ay, '\nN = ', internal_n), 
+                      ay_external_n = paste0(ay, '\nN = ', external_n))
+```
+
+Set up a template for graph.
+```{r}
+draw_graph <- function(x, orientation,
+                       title, subtitle){
+  if(nrow(x) == 0){return(NULL)}
+  if(orientation == "Internal"){
+    ay <- "ay_internal_n"
+    outcome <- "internal_outcome"
+    target <- "internal_target"
+    n <- "internal_n"
+  } else if (orientation == "External"){
+    ay <- "ay_external_n"
+    outcome <- "external_outcome"
+    target <- "external_target"
+    n <- "external_n"
+  } else {
+    return(NULL)
+  }
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_line(aes(group = 1), na.rm = TRUE) +
+    geom_point(na.rm = TRUE) +
+    geom_hline(aes_string(yintercept = target),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p <- p +
+    labs(title = title, subtitle = subtitle) +
+    ylab("Outcome") + xlab("Academic Year\nSample Size")
+  p
+}
+draw_from_mapping <- function(plo_map){
+  i_plo <- plo_map$plo
+  i_type <- plo_map$type
+  int_tool <- plo_map$internal_tool
+  ext_tool <- plo_map$external_tool
+  
+  # Make titles
+  title <- paste(i_plo, i_type, collapse = " ")
+  int_title <- paste(title, "Internal", collapse = " ")
+  ext_title <- paste(title, "External", collapse = " ")
+  int_subtitle <- paste("Assessment Tool:", int_tool)
+  ext_subtitle <- paste("Assessment Tool:", ext_tool)
+  
+  # Draw subsample from the dataset
+  x <- asm %>% filter(plo == i_plo, type == i_type) 
+  # Check for empty cases, then make plot(s)
+  int_p <- NULL
+  ext_p <- NULL
+  if (nrow(x)!=0){
+    # Check for empty cases (PLO can have internal or external or both)
+    if(int_tool != "NA"){
+      int_p <- draw_graph(x, "Internal", int_title, int_subtitle)
+      int_p <- int_p + ggthemes::theme_fivethirtyeight(base_size = 8)
+    }
+    if(ext_tool != "NA"){
+      ext_p <- draw_graph(x, "External", ext_title, ext_subtitle)
+      ext_p <- ext_p + ggthemes::theme_fivethirtyeight(base_size = 8)
+    }
+    out <- list(x, int_p, ext_p)
+    names(out) <- c(title, int_subtitle, ext_subtitle)
+    return(out)
+  } else{
+    return(NULL)
+  }
+}
+```
+
+Then, draw graphs.
+```{r}
+lx <- list()
+lp_int <- list()
+lp_ext <- list()
+for(i in 1:nrow(asm_map)){
+  out <- draw_from_mapping(asm_map[i, ])
+  if(!is.null(out)){
+    nm <- names(out[1])
+    lx[[nm]] <- out[[1]]
+    lp_int[[nm]] <- out[[2]]
+    lp_ext[[nm]] <- out[[3]]
+  }
+}
+```
+
+Finally, save the graphs. Keep those chunks `eval=FALSE` for usual runs. Execute them as needed.
+```{r, eval=FALSE}
+lp_int[[11]] + ggthemes::theme_fivethirtyeight()
+ggsave("test.png", lp_int[[11]], height = 2, width = 3.5, units = "in")
+```
+```{r, eval=FALSE, include=FALSE}
+lapply(names(lp_int),
+       function(x) ggsave(paste0("fig/", x, "_int.png"), lp_int[[x]],
+                          height = 2, width = 3.5, units = "in"))
+lapply(names(lp_ext),
+       function(x) ggsave(paste0("fig/", x, "_ext.png"), lp_ext[[x]],
+                          height = 2, width = 3.5, units = "in"))
+```
+
+Next
+================================================================================
+
