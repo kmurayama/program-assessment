@@ -1,0 +1,147 @@
+---
+title: "Note to Incorporate Disaggregate Data 01"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_notebook:
+    toc: yes
+    toc_float:
+      collapsed: yes
+    code_folding: hide
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+    df_print: paged
+    code_folding: hide
+    fig_height: 7
+    fig_width: 7
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+```
+
+Introduction
+================================================================================
+
+Objective
+--------------------------------------------------------------------------------
+For Business Core, I'd like to incorporate the information dissaggregated by students' majors.
+However, because I used the aggregate data for this project, I don't have an immediate access to such analyses from internal and external assessment projects. Let's incorporate them here.
+
+Data
+--------------------------------------------------------------------------------
+What data I need depends on the code I have in those projects. Simply keep notes here and explore linearly in the following sections.
+
+Explore
+================================================================================
+
+Internal Assessment
+--------------------------------------------------------------------------------
+From `note_inspecting_rubric_data08.Rmd`, retrieve some code.
+
+```
+attr <- mdf %>% filter(str_detect(Name, "Major|Minor")) %>% 
+  select(RubricId, UserId, Course, Assessment, Name, LevelAchieved.Original)
+attr.unq <- attr %>% distinct()
+
+majors <- attr.unq %>% filter(Name == "Major")
+majors.buscore <- majors %>% filter(Course == "BUS 499")
+pttrn.major <- c("General Busines{1,3}" = "General Business",
+                 "Integrated Global Business.*" = "Integrated Global Business")
+majors.buscore <- majors.buscore %>%
+  mutate(Major = str_to_title(LevelAchieved.Original),
+         Major = str_replace_all(Major, pttrn.major))
+table(majors.buscore$Major)
+head(majors.buscore)
+# Merge
+sdf <- mdf %>% filter(Course == "BUS 499") %>% left_join(majors.buscore %>% select(RubricId, UserId, Major), by = c("RubricId", "UserId"))
+
+res <- sdf %>% filter(str_detect(Name, "Major|Minor", negate = TRUE)) %>%
+  group_by(Assessment, Name, PLO, Major) %>%
+  summarise(Met.UND = mean(Met.UND.bin), Met.GRD = mean(Met.GRD.bin),
+            n = n_distinct(UserId))
+```
+
+> `mdf` or main data frame contains the rubric outcome data merged with the course/assessment information gathered from the survey. Data are cleaned up.
+
+Copy the scripts from the project, modify the source directories, and skip duplicate datasets:
+```{r}
+source('int_read.R')
+source('int_munge.R')
+```
+
+Then, use the existing code.
+
+- First, extract observations about students' majors and minors.
+- For simplicity, focus on majors this time. Also, focus on business core (BUS 499).
+- Clean up the data.
+- Merge the data on majors into the rubric outcomes
+
+```{r}
+attr <- mdf %>% filter(str_detect(Name, "Major|Minor")) %>% 
+  select(RubricId, UserId, Course, Assessment, Name, LevelAchieved.Original)
+attr.unq <- attr %>% distinct()
+# dim(attr); dim(attr.unq)
+
+majors <- attr.unq %>% filter(Name == "Major")
+majors.buscore <- majors %>% filter(Course == "BUS 499")
+
+pttrn.major <- c("General Busines{1,3}" = "ISBC",
+                 "Interdisciplinary Studies In Business And Commerce" = "ISBC",
+                 "Integrated Global Business.*" = "Integrated Global Business")
+majors.buscore <- majors.buscore %>%
+  mutate(Major = str_to_title(LevelAchieved.Original),
+         Major = str_replace_all(Major, pttrn.major))
+# table(majors.buscore$Major)
+# head(majors.buscore)
+sdf <- mdf %>% filter(Course == "BUS 499") %>%
+  left_join(majors.buscore %>% select(RubricId, UserId, Major),
+            by = c("RubricId", "UserId"))
+```
+
+
+```{r}
+res <- sdf %>% filter(str_detect(Name, "Major|Minor", negate = TRUE)) %>%
+  group_by(Assessment, Name, PLO, Major) %>%
+  summarise(Met.UND = mean(Met.UND.bin), Met.GRD = mean(Met.GRD.bin),
+            n = n_distinct(UserId))
+knitr::kable(res, dig = 2)
+```
+
+Map them into PLOs. Brute force.
+```{r}
+lres <- list()
+lres[["PLO2"]] <- res %>% filter(str_detect(Name, "Plo2")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 2)
+lres[["PLO3"]] <- res %>% filter(str_detect(Name, "Plo3")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 3)
+lres[["PLO4"]] <- res %>% filter(str_detect(Name, "Plo4")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 4)
+lres[["PLO5"]] <- res %>% filter(str_detect(Name, "5[a|b|c|d]")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 5)
+lres[["PLO6"]] <- res %>% filter(str_detect(Name, "6[e|f|g]")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 6)
+lres[["PLO7"]] <- res %>% filter(str_detect(Name, "Plo7")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 7)
+lres[["PLO8"]] <- res %>% filter(str_detect(Name, "Plo8")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 8)
+lres[["PLO9"]] <- res %>% filter(str_detect(Name, "Plo9")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 9)
+lres[["PLO10"]] <- res %>% filter(str_detect(Name, ".*")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 10)
+
+out <- bind_rows(lres)
+knitr::kable(out, dig=2)
+```
+```{r}
+p <- ggplot(out %>% filter(PLO == 2), aes(str_sub(Major, 1, 15), Met - 0.7))
+p + geom_col(width = 0.05) + geom_point() +  coord_flip()
+```
+
+
+```{r}
+p <- ggplot(out %>% filter(Major == "Management"),
+            aes(factor(PLO), Met - 0.7))
+p + geom_col()
+```
+
+External Assessment
+--------------------------------------------------------------------------------
+Reviewing the criteria, realized that Peregrine test scores are already "disaggregated" in each program's external assessments. Perhaps I can show the scores for each topic broken down by majors... but Ahmet should be working on those. Let's skip for now.
+

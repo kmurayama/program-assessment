@@ -5,6 +5,12 @@
 data/*
 !data/README.md
 *docx
+!template*.docx
 *html
 
 fig/*
+out/*
+
+*/*_cache/*
+*/*_files/*
+*/libs/*

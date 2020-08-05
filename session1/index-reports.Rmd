@@ -1,0 +1,21 @@
+---
+title: "Index for Reports"
+author: "Kentaro Murayama"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+
+```{r, reports}
+prgs <- c("Accounting", "Business Core", "Economics", "Finance",
+          "Human Resources Management", "Management", "Marketing",
+          "MIS", "MBA")
+codes <- c("ACC", "BUS", "ECO", "FIN", "HRM", "MGM", "MKT", "MIS", "MBA")
+for (i in 1:length(prgs)){
+  prg <- prgs[i]
+  code <- codes[i]
+  rmarkdown::render("report-template.Rmd", params = list(program = prg, code = code),
+                    output_file = paste0("Report-", prg, ".docx"))
+}
+```
+

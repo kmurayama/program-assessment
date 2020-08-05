@@ -1,0 +1,783 @@
+---
+title: 'Assessment Analysis Case: Business Core'
+author: "Kentaro Murayama"
+date: "8/5/2020"
+output:
+  xaringan::moon_reader:
+    css: [default, metropolis, metropolis-fonts]
+    lib_dir: libs
+---
+
+# Assessment Visualization
+
+We would like to assess and develop our curriculum.
+
+## Standard 4: Student Learning Assessment
+
+> The business unit must have a systematic student learning outcomes assessment
+process and plan that leads to continuous improvement. Student learning outcomes
+must be developed and implemented for each accredited program, and the results
+must be communicated to stakeholders.
+
+
+## Standard 6: Curriculum
+
+> The business unit must have a systematic process to ensure continuous
+improvement of curriculum and program delivery. The curriculum must be comprised
+of appropriate business and professional content to prepare graduates for
+success.
+
+<https://acbsp.org/general/custom.asp?page=accreditation-standards>
+
+--
+
+i.e. Past and Data &rarr; Future and Strategy.
+
+---
+
+# Assessment Visualization
+
+## Examples of Data Types
+
+|            | Internal | External |
+|---|---|---|
+| Formative  | MBA Final Exams | |
+| Summative  | Sig. Assignmnets | CPC Exams |
+|---|---|---|
+| Indirect  |                  | Survey    |
+
+---
+
+# Assessment Visualization
+
+Or more...
+
+- Operational key performance indicators
+    - Graduation Rates
+    - Retention Rates
+    - Enrollment
+- Stakeholder satisfaction
+    - Student satisfaction
+    - Alumni satisfaction
+- Faculty and staff focus
+    - Professional development
+    - Scholarly activity
+    - Faculty qualifications
+- Support key performance indicators
+    - Computer support
+    - Library research support
+    - Administrative support
+    
+<https://acbsp.org/general/custom.asp?page=outcomes_assessment>
+
+---
+
+# Assessment Visualization
+
+## Data Presented Here
+
+Assessment Outcomes for Business Core (BUS 499) are presented to show the following:
+
+- Trends Over Time
+- Associations by Type
+- Comparisons against Target Levels
+
+--
+
+## Goals
+
+- To share the insights for Business Core results with everyone
+- To explain the data presentation used in each program reports
+- To demonstrate the type of analysis we will do in the following session
+- To gather feedback from everyone to improve the processes above
+
+---
+exclude: true
+
+# Set up
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+```
+```{r load, cache=TRUE}
+path <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\WIP\\"
+asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Sheet0")
+asm_map <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Mapping")
+
+asm <- asm %>%
+  mutate(int_delta = internal_outcome - internal_target,
+         ext_delta = external_outcome - external_target)
+asm <- asm %>% mutate(ay_internal_n = paste0(ay, '\nN = ', internal_n), 
+                      ay_external_n = paste0(ay, '\nN = ', external_n))
+prg <- "Business Core"
+```
+```{r corr}
+draw_corr <- function(prg, ty = c("Summative", "Formative", "Both")){
+  type <- match.arg(ty)
+  # Select samples and 
+  if (ty == "Both"){
+    x <- asm %>% filter(program == prg)
+  } else {
+    x <- asm %>% filter(program == prg, type == ty)
+  }
+  if (all(is.na(x$external_outcome)) |
+      all(is.na(x$internal_outcome))){
+    return(NULL)}
+  
+  xmin <- min(x$internal_outcome, x$internal_target)
+  ymin <- min(x$external_outcome, x$external_target)
+  
+  title <- paste(prg, type, "External vs Internal")
+  subtitle <- "Assessment outcomes are plotted to each other."
+  subtitle <- paste0(subtitle, "\nRed point is the 2019 result")
+  
+  p <- ggplot(x, aes(internal_outcome, external_outcome)) +
+    geom_path(linetype = "longdash", na.rm = TRUE) +
+    geom_point(aes(color = ay == 2019), na.rm = TRUE) +
+    scale_color_manual(values = c("black", "red")) +
+    geom_hline(aes(yintercept = external_target), color = "black", alpha = 0.3) +
+    geom_vline(aes(xintercept = internal_target), color = "black", alpha = 0.3)
+  p <- p +
+    facet_wrap(vars(plo))
+  p + 
+    labs(title = title, subtitle = subtitle) +
+    xlab("Internal Assessment Outcomes") +
+    ylab("External Assessment Outcomes") +
+    scale_x_continuous(breaks = 1:10/10,
+                       labels=scales::percent_format(accuracy = 5L)) +
+    scale_y_continuous(breaks = 1:10/10,
+                       labels=scales::percent_format(accuracy = 5L)) +
+    coord_cartesian(xlim = c(xmin - 0.05, 1.01), ylim = c(ymin - 0.05, 1.01)) +
+    theme_minimal() +
+    theme(legend.position = "none",
+          aspect.ratio = 1)
+}
+# draw_corr("Human Resources Management", "Both")
+# draw_corr("Accounting", "Summative")
+```
+```{r delta}
+list_plo <- function(prg){
+  asm_map %>% filter(program == prg) %>%
+    select(plo, description, ends_with("tool_description")) %>%
+    knitr::kable()
+}
+draw_delta <- function(prg, yr = 2019, ori = c("External", "Internal")){
+  type <- match.arg(ori)
+  
+  if (ori == "External"){
+    delta <- "ext_delta"
+  } else {
+    delta <- "int_delta"
+  }
+  
+  title <- paste(prg, ori, "for", yr)
+  subtitle <- "Differences between target achievements and actual outcomes"
+  
+  x <- asm %>% filter(program == prg, ay == yr)
+  x <- x %>% mutate(plo = ordered(str_extract(plo, "\\d{1,2}"), levels = 1:10))
+  p <- ggplot(x, aes_string("plo", delta)) +
+    geom_col(na.rm = TRUE) +
+    geom_hline(yintercept = c(-0.2, 0.2), color = "red", alpha = 0.5) +
+    geom_hline(yintercept = 0.0, color = "black", alpha = 0.4)
+  p +
+    labs(title = title, subtitle = subtitle) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L),
+                       breaks = -5:5/10) +
+    ggthemes::theme_fivethirtyeight(base_size = 8) +
+    theme(legend.position = "none")
+}
+combine_deltas <- function(prg, yr = 2019){
+  p1 <- draw_delta(prg, yr, "External")
+  p2 <- draw_delta(prg, yr, "Internal")
+  gridExtra::grid.arrange(p1, p2, ncol = 2)
+}
+# draw_delta("Business Core", ori = "External")
+# draw_delta("Human Resources Management", ori = "Internal")
+```
+```{r time}
+draw_time <- function(lo, ori = c("External", "Internal"),
+                      typ = c("Summative", "Formative")){
+  ori <- match.arg(ori)
+  typ <- match.arg(typ) 
+  if (ori == "External"){
+    outcome <- "external_outcome"
+    target <- "external_target"
+    ay <- "ay_external_n"
+  } else {
+    outcome <- "internal_outcome"
+    target <- "internal_target"
+    ay <- "ay_internal_n"
+  }
+  x <- asm %>% filter(plo == lo, type == typ)
+  if (all(is.na(x$external_outcome)) |
+      all(is.na(x$internal_outcome))){
+    return(NULL)}
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_line(aes(group = 1), na.rm = TRUE) +
+    geom_point(size = 2, na.rm = TRUE) +
+    geom_hline(aes_string(yintercept = target),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p + ggthemes::theme_fivethirtyeight()
+  p
+}
+combine_time <- function(lo, typ){
+  x <- asm_map %>% filter(plo == lo, type == typ)
+  title <- paste(lo, typ, "Assessment Outcomes")
+  title <- paste0(title,
+                  str_sub(paste0("\n(", x %>% pull(description)), 1, 50), "...)" )
+  p1 <- draw_time(lo, "Internal", typ)
+  p2 <- draw_time(lo, "External", typ)
+  if (is.null(p1) & is.null(p2)){
+    return(NULL)
+  }
+  if (is.null(p1)){
+    p1 <- ggplot() + theme_void()
+  } else{
+    p1 <- p1 +
+      ylab("Internal") +
+      xlab("Academic Year\nSample Size") +
+      theme(plot.title = element_blank(),
+            plot.subtitle = element_blank(),
+            axis.title.x = element_blank(),
+            legend.position = "none") +
+      ggthemes::theme_fivethirtyeight(base_size = 16)
+  }
+  if (is.null(p2)){
+    p2 <- ggplot() + theme_void()
+  } else{
+    p2 <- p2 +
+      ylab("External") +
+      xlab("Academic Year\nSample Size") +
+      theme(plot.title = element_blank(),
+            plot.subtitle = element_blank(),
+            axis.title.x = element_blank(),
+            legend.position = "none") +
+      ggthemes::theme_fivethirtyeight(base_size = 16)
+  }
+  gridExtra::grid.arrange(p1, p2, ncol = 1, top = title)
+}
+gather_times <- function(prg){
+  lplo <- asm_map %>% filter(program == prg) %>% pull(plo)
+  ltyp <- asm_map %>% filter(program == prg) %>% pull(type)
+  for (i in 1:length(lplo)){
+    combine_time(lplo[i], ltyp[i])
+  }
+}
+# gather_times("Human Resources Management")
+```
+
+```{r}
+draw_time2 <- function(lo, ori, typ){
+  if (ori == "External"){
+    subt <- asm_map %>% filter(program == prg, plo == lo) %>%
+      pull(external_tool_description)
+  } else {
+    subt <- asm_map %>% filter(program == prg, plo == lo) %>%
+      pull(internal_tool_description)
+  }
+  p <- draw_time(lo, ori, typ)
+  p <- p +
+    labs(title = ori, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    theme(plot.title = element_blank(),
+          plot.subtitle = element_blank(),
+          axis.title.x = element_blank(),
+          legend.position = "none") +
+    ggthemes::theme_fivethirtyeight(base_size = 18)
+  p
+}
+```
+```{r}
+draw_corr2 <- function(lo, ty = c("Summative", "Formative", "Both")){
+  type <- match.arg(ty)
+
+  if (ty == "Both"){
+    x <- asm %>% filter(plo == lo)
+  } else {
+    x <- asm %>% filter(plo == lo, type == ty)
+  }
+  if (all(is.na(x$external_outcome)) |
+      all(is.na(x$internal_outcome))){
+    return(NULL)}
+  
+  xmin <- min(x$internal_outcome, x$internal_target)
+  ymin <- min(x$external_outcome, x$external_target)
+  
+  title <- "External vs Internal"
+  caption <- "(Grey lines: Target levels; Red point: 2019 result)"
+  
+  p <- ggplot(x, aes(internal_outcome, external_outcome)) +
+    geom_path(linetype = "longdash", na.rm = TRUE) +
+    geom_point(aes(color = ay == 2019), na.rm = TRUE) +
+    scale_color_manual(values = c("black", "red")) +
+    geom_hline(aes(yintercept = external_target), color = "black", alpha = 0.3) +
+    geom_vline(aes(xintercept = internal_target), color = "black", alpha = 0.3)
+  p + 
+    labs(title = title, caption = caption) +
+    xlab("Internal Assessment Outcomes") +
+    ylab("External Assessment Outcomes") +
+    scale_x_continuous(breaks = 1:10/10,
+                       labels=scales::percent_format(accuracy = 5L)) +
+    scale_y_continuous(breaks = 1:10/10,
+                       labels=scales::percent_format(accuracy = 5L)) +
+    coord_cartesian(xlim = c(xmin - 0.05, 1.01), ylim = c(ymin - 0.05, 1.01)) +
+    ggthemes::theme_fivethirtyeight(base_size = 12) +
+    theme(axis.title = element_text(),
+          legend.position = "none",
+          aspect.ratio = 1)
+}
+# draw_corr2("BUS 1", "Summative")
+```
+
+---
+
+# Demonstration: BUS 5 Summative
+```{r}
+lo <- "BUS 5"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+- Good improvements both in internal and external assessment outcomes.
+- External assessment - based on a CPC exam section - remains higher than the target level, US Average.
+- However, the achievements appear to be rather extreme.
+    - Nearly 20 percentage points above the US average and
+    - improvement by 10 percentage points in a year.
+    
+Suggestive Improvement: Have a video monitoring to assure the fair assessment process.
+
+]
+
+---
+
+# Demonstration: BUS 5 Summative
+```{r}
+lo <- "BUS 5"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+- Internal assessment outcomes - capstone instrument Company Profile assignment - have improved over time, passing the target level in  academic year 2018 and continued the improvement in 2019.
+- Target achievement level is appropriate, given a moderate level of "excess" achievements.
+
+Suggestive Improvement: Implement additional analyses (e.g. consistency among instructors, rubric row specific comparison of students' outcomes) and refine the assessment.
+
+]
+
+---
+
+# Demonstration: BUS 5 Summative
+
+```{r}
+lo <- "BUS 5"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ) + geom_text(aes(label = ay), nudge_x = 0.05)
+```
+
+Plot of internal vs external assessment outcomes over time.
+]
+.pull-right[
+What am I seeing?
+
+- Red point shows the combination of internal and external assessment outcomes for the academic year 2019: 85% Internal & 80% External
+- Other dots show the combinations over time: 2018, 2017, and 2016, following the broken line
+]
+
+---
+
+# Demonstration: BUS 5 Summative
+
+```{r}
+lo <- "BUS 5"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ) + annotate("segment", x = 0.50, xend = 0.85, y = 0.63, yend = 0.78, colour = "orange", size=2, alpha=0.7, arrow=arrow())
+```
+
+Plot of internal vs external assessment outcomes over time.
+]
+.pull-right[
+What do I get out of this picture?
+
+- Overall trend from bottom-left to upper-right: From 2016 to 2019, both the external and internal assessment outcomes have improved
+- Rather flat line: However, the change in the internal assessment outcomes have been overwhelmingly strong
+
+]
+
+---
+
+# Demonstration: BUS 5 Summative
+
+```{r}
+lo <- "BUS 5"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ)
+```
+
+Plot of internal vs external assessment outcomes over time.
+]
+.pull-right[
+So what?
+
+Let's suppose 
+1. the external assessments measure basic knowledge of students (e.g. what does A mean?), while
+2. internal assessments measure applied knowledge (e.g. how can/would you use A in business?).
+
+Then, this picture implies that Business Core improved its process so that students can utilize their knowledge to analyze business situations and communicate solutions.
+
+]
+
+---
+
+# Enough Talk, Show Me Data
+
+Alright, I'll show Business Core PLO 1-10 outcomes and discuss very briefly.
+
+Please type into chat if you have anything you'd like to add.
+
+---
+
+# BUS 1 Summative
+
+```{r}
+lo <- "BUS 1"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ)
+```
+]
+
+
+---
+
+# BUS 2 Summative
+
+```{r}
+lo <- "BUS 2"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ)
+```
+]
+
+---
+
+# BUS 3 Summative
+```{r}
+lo <- "BUS 3"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ)
+```
+
+]
+
+---
+
+# BUS 4 Summative
+```{r}
+lo <- "BUS 4"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ)
+```
+]
+
+---
+
+# BUS 5 Summative
+```{r}
+lo <- "BUS 5"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ)
+```
+]
+
+---
+
+# BUS 6 Summative
+```{r}
+lo <- "BUS 6"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ)
+```
+]
+
+---
+
+# BUS 7 Summative
+```{r}
+lo <- "BUS 7"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ)
+```
+]
+
+---
+
+# BUS 8 Summative
+```{r}
+lo <- "BUS 8"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ)
+```
+]
+
+---
+
+# BUS 9 Summative
+```{r}
+lo <- "BUS 9"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ)
+```
+]
+
+---
+
+# BUS 10 Summative
+```{r}
+lo <- "BUS 10"
+typ <- "Summative"
+dsc <- asm_map %>% filter(program == prg, plo == lo) %>% pull(description)
+```
+`r dsc`
+
+.pull-left[
+```{r, fig.height=4}
+draw_time2(lo, "Internal", typ)
+```
+```{r, fig.height=4}
+draw_time2(lo, "External", typ)
+```
+]
+.pull-right[
+```{r, fig.width=5, fig.height=5}
+draw_corr2(lo, typ)
+```
+]
+
+---
+# Where Are We Standing Now?
+
+Next, I'll show a "snapshot" of the PLO outcomes for academic year 2019.
+
+I took the differences between the actual outcomes and target levels.
+
+---
+class: center
+
+# Snapshot of Academic Year 2019
+```{r, fig.width=9, fig.height=5}
+combine_deltas(prg)
+```
+
+- All PLO outcomes fulfilled the targets both in external and internal assessments.
+- Inflating grades in CPC exams are evident. Even the lowest is close to 10 percentage points above the US average (BUS 9 Organizational behavior)
+- Internal assessments for BUS 1 & 2 outcomes exceed the target by more than 20 percentage points. It may need re-evaluation.
+
+
+
+---
+exclude: true
+
+# Disaggregation by Majors
+```{r}
+# Run int_prepare.R if not available
+disag <- readRDS("../out/disag.Rds")
+disag <- disag %>% mutate(PLO = paste0("BUS ", PLO, "\nn=", n))
+draw_disag <- function(prg){
+  title <- paste("Business Core Outcome for", prg, "Majors")
+  p <- ggplot(disag %>% filter(Major == prg), aes(factor(PLO), Met - 0.7)) +
+    geom_col()
+  p + 
+    labs(title = title) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L),
+                       breaks = -5:5/10) +
+    ggthemes::theme_fivethirtyeight(base_size = 8) +
+    theme(legend.position = "none")
+  
+}
+# draw_disag("Marketing")
+```
+
+---
+exclude:true
+
+```{r, eval=FALSE}
+pagedown::chrome_print("presentation-business-core-2.html",
+                       output="out/slides-demonstration.pdf")
+```
+
+---
+
+# Thank You
+
+After all the presentations, we will discuss in *breakout rooms* forming groups by specialty/program.
+
+Please use the Word files placed in "Strategy Meeting 2020 Summer/20200805 Session 1 Aug 5" folder to record your discussions.
+

@@ -1,0 +1,216 @@
+---
+title: 'Assessment Analysis Case: Business Core'
+author: "Kentaro Murayama"
+date: "8/5/2020"
+output: slidy_presentation
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+```
+```{r load, cache=TRUE}
+path <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\WIP\\"
+asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Sheet0")
+asm_map <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Mapping")
+
+asm <- asm %>%
+  mutate(int_delta = internal_outcome - internal_target,
+         ext_delta = external_outcome - external_target)
+asm <- asm %>% mutate(ay_internal_n = paste0(ay, '\nN = ', internal_n), 
+                      ay_external_n = paste0(ay, '\nN = ', external_n))
+prg <- "Business Core"
+```
+```{r time}
+draw_time <- function(lo, ori = c("External", "Internal"),
+                      typ = c("Summative", "Formative")){
+  ori <- match.arg(ori)
+  typ <- match.arg(typ) 
+  if (ori == "External"){
+    outcome <- "external_outcome"
+    target <- "external_target"
+    ay <- "ay_external_n"
+  } else {
+    outcome <- "internal_outcome"
+    target <- "internal_target"
+    ay <- "ay_internal_n"
+  }
+  x <- asm %>% filter(plo == lo, type == typ)
+  if (all(is.na(x$external_outcome)) |
+      all(is.na(x$internal_outcome))){
+    return(NULL)}
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_line(aes(group = 1), na.rm = TRUE) +
+    geom_point(na.rm = TRUE) +
+    geom_hline(aes_string(yintercept = target),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p + ggthemes::theme_fivethirtyeight()
+  p
+}
+combine_time <- function(lo, typ){
+  x <- asm_map %>% filter(plo == lo, type == typ)
+  title <- paste(lo, typ, "Assessment Outcomes")
+  title <- paste0(title,
+                  str_sub(paste0("\n(", x %>% pull(description)), 1, 50), "...)" )
+  p1 <- draw_time(lo, "Internal", typ)
+  p2 <- draw_time(lo, "External", typ)
+  if (is.null(p1) & is.null(p2)){
+    return(NULL)
+  }
+  if (is.null(p1)){
+    p1 <- ggplot() + theme_void()
+  } else{
+    p1 <- p1 +
+      ylab("Internal") +
+      xlab("Academic Year\nSample Size") +
+      theme(plot.title = element_blank(),
+            plot.subtitle = element_blank(),
+            axis.title.x = element_blank(),
+            legend.position = "none") +
+      ggthemes::theme_fivethirtyeight()
+  }
+  if (is.null(p2)){
+    p2 <- ggplot() + theme_void()
+  } else{
+    p2 <- p2 +
+      ylab("External") +
+      xlab("Academic Year\nSample Size") +
+      theme(plot.title = element_blank(),
+            plot.subtitle = element_blank(),
+            axis.title.x = element_blank(),
+            legend.position = "none") +
+      ggthemes::theme_fivethirtyeight()
+  }
+  gridExtra::grid.arrange(p1, p2, ncol = 1, top = title)
+}
+gather_times <- function(prg){
+  lplo <- asm_map %>% filter(program == prg) %>% pull(plo)
+  ltyp <- asm_map %>% filter(program == prg) %>% pull(type)
+  for (i in 1:length(lplo)){
+    combine_time(lplo[i], ltyp[i])
+  }
+}
+# gather_times("Human Resources Management")
+```
+```{r corr}
+draw_corr <- function(prg, ty = c("Summative", "Formative", "Both")){
+  type <- match.arg(ty)
+  # Select samples and 
+  if (ty == "Both"){
+    x <- asm %>% filter(program == prg)
+  } else {
+    x <- asm %>% filter(program == prg, type == ty)
+  }
+  if (all(is.na(x$external_outcome)) |
+      all(is.na(x$internal_outcome))){
+    return(NULL)}
+  
+  xmin <- min(x$internal_outcome, x$internal_target)
+  ymin <- min(x$external_outcome, x$external_target)
+  
+  title <- paste(prg, type, "External vs Internal")
+  subtitle <- "Assessment outcomes are plotted to each other."
+  subtitle <- paste0(subtitle, "\nRed point is the 2019 result")
+  
+  p <- ggplot(x, aes(internal_outcome, external_outcome)) +
+    geom_path(linetype = "longdash", na.rm = TRUE) +
+    geom_point(aes(color = ay == 2019), na.rm = TRUE) +
+    scale_color_manual(values = c("black", "red")) +
+    geom_hline(aes(yintercept = external_target), color = "black", alpha = 0.3) +
+    geom_vline(aes(xintercept = internal_target), color = "black", alpha = 0.3)
+  p <- p +
+    facet_wrap(vars(plo))
+  p + 
+    labs(title = title, subtitle = subtitle) +
+    xlab("Internal Assessment Outcomes") +
+    ylab("External Assessment Outcomes") +
+    scale_x_continuous(breaks = 1:10/10,
+                       labels=scales::percent_format(accuracy = 5L)) +
+    scale_y_continuous(breaks = 1:10/10,
+                       labels=scales::percent_format(accuracy = 5L)) +
+    coord_cartesian(xlim = c(xmin - 0.05, 1.01), ylim = c(ymin - 0.05, 1.01)) +
+    theme_minimal() +
+    theme(legend.position = "none",
+          aspect.ratio = 1)
+}
+# draw_corr("Human Resources Management", "Both")
+# draw_corr("Accounting", "Summative")
+```
+```{r delta}
+list_plo <- function(prg){
+  asm_map %>% filter(program == prg) %>%
+    select(plo, description, ends_with("tool_description")) %>%
+    knitr::kable()
+}
+draw_delta <- function(prg, yr = 2019, ori = c("External", "Internal")){
+  type <- match.arg(ori)
+  
+  if (ori == "External"){
+    delta <- "ext_delta"
+  } else {
+    delta <- "int_delta"
+  }
+  
+  title <- paste(prg, ori, "Deltas for", yr)
+  subtitle <- "Differences between target achievements and actual outcomes"
+  
+  x <- asm %>% filter(program == prg, ay == yr)
+  p <- ggplot(x, aes_string("plo", delta)) +
+    geom_col(na.rm = TRUE) +
+    geom_hline(yintercept = c(-0.2, 0.2), color = "red", alpha = 0.5) +
+    geom_hline(yintercept = 0.0, color = "black", alpha = 0.4)
+  p +
+    labs(title = title, subtitle = subtitle) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L),
+                       breaks = -5:5/10) +
+    ggthemes::theme_fivethirtyeight(base_size = 8) +
+    theme(legend.position = "none")
+}
+combine_deltas <- function(prg, yr = 2019){
+  p1 <- draw_delta(prg, yr, "External")
+  p2 <- draw_delta(prg, yr, "Internal")
+  gridExtra::grid.arrange(p1, p2, ncol = 2)
+}
+# draw_delta("Business Core", ori = "External")
+# draw_delta("Human Resources Management", ori = "Internal")
+```
+
+Goals of This Presentation
+--------------------------------------------------------------------------------
+
+
+About the Data
+--------------------------------------------------------------------------------
+
+
+Case: Business Core
+--------------------------------------------------------------------------------
+
+
+Trends Over Time
+--------------------------------------------------------------------------------
+```{r, out.height="50%"}
+combine_time("BUS 1", "Summative")
+# gather_times(prg)
+```
+
+Trends in Internal and External Assessments
+--------------------------------------------------------------------------------
+```{r, fig.width=7, fig.height=7}
+draw_corr(prg, "Both")
+```
+
+
+Snapshot of Academic Year 2019
+--------------------------------------------------------------------------------
+```{r, fig.width=7, fig.height=4}
+combine_deltas(prg)
+```
+
+Disaggregation by Majors
+--------------------------------------------------------------------------------
+

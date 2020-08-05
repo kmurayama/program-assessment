@@ -1,12 +1,7 @@
 ---
 title: "Note to Inspect Assessment Data 1"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+date: "2020/07/28"
 output:
-  html_notebook:
-    toc: yes
-    toc_float:
-      collapsed: yes
-    code_folding: hide
   html_document:
     toc: yes
     toc_float:
@@ -15,6 +10,11 @@ output:
     code_folding: hide
     fig_height: 7
     fig_width: 7
+  html_notebook:
+    toc: yes
+    toc_float:
+      collapsed: yes
+    code_folding: hide
 ---
 
 ```{r, echo=FALSE, include=FALSE}
@@ -30,17 +30,316 @@ Now the data for external and internal assessments are (mostly) ready. Look at
 the data to see any trends. Produce graphs. (It should be Excel ready, but R is
 faster for me. Ask Ahmet for help on that.)
 
-Set up
+Data
 ================================================================================
-Data are semi-manually input from `external-direct-assessment` and `internal-direct-assessment` projects into the main Excel file. Use it as a database here.
+Main data file has been updated. Now the mapping worksheet separates internal and external assessments, aligned wit the data worksheet.
 ```{r}
-path <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
-asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Main")
-summary(asm)
+path <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\WIP\\"
+asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Sheet0")
+asm_map <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Mapping")
 ```
 
-The worksheet is organized in a "long" format, convenient to work with `dplyr` and `ggplot2` paradigm. If wide tables are needed, simply filter and reshape it.
+```{r}
+asm <- asm %>%
+  mutate(int_delta = internal_outcome - internal_target,
+         ext_delta = external_outcome - external_target)
 
+```
+
+
+Visualize
+================================================================================
+
+Correlate Internal and External
+--------------------------------------------------------------------------------
+
+### Prepare and Test
+
+```{r}
+draw_corr <- function(prg, ty = c("Summative", "Formative", "Both")){
+  type <- match.arg(ty)
+  # Select samples and 
+  # ToDo: Try arrows
+  # ToDo: Add obs to axis?
+  if (ty == "Both"){
+    x <- asm %>% filter(program == prg)
+  } else {
+    x <- asm %>% filter(program == prg, type == ty)
+  }
+  if (all(is.na(x$external_outcome)) |
+      all(is.na(x$internal_outcome))){
+    return(NULL)}
+  
+  title <- paste(prg, type, "External vs Internal")
+  subtitle <- "Assessment outcomes are plotted to each other\nRed point is the 2019 result"
+  
+  p <- ggplot(x, aes(internal_outcome, external_outcome)) +
+    geom_path(linetype = "longdash", na.rm = TRUE) +
+    geom_point(aes(color = ay == 2019), na.rm = TRUE) +
+    scale_color_manual(values = c("black", "red")) +
+    #geom_text(aes(label = ay), size = 3, nudge_x = 0.03, na.rm = TRUE) +
+    geom_hline(aes(yintercept = external_target), color = "red", alpha = 0.5) +
+    geom_vline(aes(xintercept = internal_target), color = "red", alpha = 0.5)
+  p <- p +
+    facet_wrap(vars(plo))
+  p + 
+    labs(title = title, subtitle = subtitle) +
+    xlab("Internal Assessment Outcomes") +
+    ylab("External Assessment Outcomes") +
+    scale_x_continuous(breaks = 1:10/10,
+                       labels=scales::percent_format(accuracy = 5L)) +
+    scale_y_continuous(breaks = 1:10/10,
+                       labels=scales::percent_format(accuracy = 5L)) +
+    coord_cartesian(xlim = c(0.5, 1.01), ylim = c(0.5, 1.01)) +
+    theme(legend.position = "none", aspect.ratio = 1)
+    #theme(plot.title = element_text(size = 10),
+    #      plot.subtitle = element_text(size = 8),
+    #      legend.position = "none", aspect.ratio = 1)
+}
+#draw_corr("Accounting", "Summative")
+
+list_plo <- function(prg){
+  asm_map %>% filter(program == prg) %>%
+    select(plo, description, ends_with("tool_description")) %>%
+    knitr::kable()
+}
+```
+
+
+```{r, eval=FALSE}
+draw_corr("Accounting", "Summative") +
+    ggthemes::theme_fivethirtyeight()
+draw_corr("Business Core", "Summative")
+draw_corr("Economics", "Summative")
+```
+
+### Quick Observations
+```{r, fig.height=7, fig.width=7}
+draw_corr("Accounting", "Summative")
+```
+
+- Both achievement levels remain high and pass the target levels.
+- Movements are mostly (except for ACC 1) contained with in 20% ranges.
+- However, common trends are toward lower internal assessment
+
+```{r}
+list_plo("Accounting")
+```
+
+
+```{r, fig.height=7, fig.width=7}
+draw_corr("Business Core", "Summative")
+```
+
+- BUS 1 Summative is measured through Peregrine CPC test. Since external measures the average and internal measures the distribution of final scores, they naturally have a strong positive correlation.
+- Almost all PLOs improved in external assessment outcomes, while remained about the same in internal assessment outcomes.
+- Exceptionally, BUS 5 analysis of business situations have shown a significant improvement in the internal assessment.
+
+```{r}
+asm_map %>% filter(program == "Business Core") %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r, fig.height=7, fig.width=7}
+draw_corr("Economics", "Both")
+```
+
+- Lacks consistent observations (either internal or external, or both, are missing).
+- Some improvements in external assessment outcomes (ECO 3 ability to form research questions, ECO 4 information/data literacy).
+
+```{r}
+asm_map %>% filter(program == "Economics") %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r, fig.height=7, fig.width=7}
+draw_corr("Human Resources Management", "Summative") +
+  coord_cartesian(xlim = c(0.3, 1), ylim = c(0.3, 1))
+```
+
+- Internal assessment outcomes in 2019 have declined significantly largely due to the renewed standards.
+- External assessment outcomes had moderate fluctuations, but improved to remain above the target level.
+
+```{r}
+asm_map %>% filter(program == "Human Resources Management") %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r, fig.height=7, fig.width=7}
+draw_corr("Finance", "Summative") +
+  coord_cartesian(xlim = c(0.4, 1), ylim = c(0.4, 1))
+```
+
+- While both FIN 1 and 2 improved in external assessment outcomes over time, FIN 2 suffered from a lower outcome in FIN 2.
+- Note, however, the internal assessment has been done by different set of instructors in 2019 and no internal structure (i.e. rubric rows) is available. So, this change might be attributed to different grading practices.
+
+```{r}
+asm_map %>% filter(program == "Finance") %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r, fig.height=7, fig.width=7}
+draw_corr("Management", "Summative")
+```
+```{r}
+asm_map %>% filter(program == "Management") %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+
+
+```{r, fig.height=7, fig.width=7}
+draw_corr("Marketing", "Summative")
+```
+```{r}
+asm_map %>% filter(program == "Marketing") %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+
+
+```{r, fig.height=7, fig.width=7}
+draw_corr("MBA", "Summative")
+```
+
+- Formative assessments only consist of internal assessments.
+- Summative *internal* assessment outcomes for 2019 (comp exam) need to be provided.
+
+```{r}
+asm_map %>% filter(program == "MBA") %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+
+
+Delta
+--------------------------------------------------------------------------------
+
+### Prepare and Test
+
+```{r}
+draw_delta <- function(prg, yr = 2019, ori = c("External", "Internal")){
+  type <- match.arg(ori)
+  
+  if (ori == "External"){
+    delta <- "ext_delta"
+  } else {
+    delta <- "int_delta"
+  }
+  
+  title <- paste(prg, ori, "Deltas for", yr)
+  subtitle <- "Differences between target achievements and actual outcomes"
+  
+  x <- asm %>% filter(program == prg, ay == yr)
+  p <- ggplot(x, aes_string("plo", delta)) +
+    geom_col(na.rm = TRUE) +
+    geom_hline(yintercept = c(-0.2, 0.2), color = "red", alpha = 0.5) +
+    geom_hline(yintercept = 0.0, color = "black", alpha = 0.4)
+  p <- p + coord_flip()
+  p + ggthemes::theme_fivethirtyeight() +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L)) +
+    labs(title = title, subtitle = subtitle) +
+    theme(plot.title = element_text(size = 8),
+          plot.subtitle = element_text(size = 6),
+          legend.position = "none")
+}
+#draw_delta("Business Core", ori = "External")
+#draw_delta("Business Core", ori = "Internal")
+
+combine_deltas <- function(prg, yr = 2019){
+  p1 <- draw_delta(prg, yr, "External")
+  p2 <- draw_delta(prg, yr, "Internal")
+  gridExtra::grid.arrange(p1, p2, ncol = 2)
+}
+```
+
+
+```{r, eval=FALSE}
+combine_deltas("Accounting")
+combine_deltas("Business Core")
+combine_deltas("Economics")
+```
+
+### Quick Observations
+```{r}
+combine_deltas("Accounting")
+```
+
+- External assessments 1-4 are the same measure (CPC Exam Accounting score). The outcome is well beyond the target level.
+- All the four internal goals have been achieved with significant margins. ACC 2 - compare the impact of altrnative costing methods - might need to updateh the target.
+
+
+```{r}
+list_plo("Accounting")
+```
+
+```{r}
+prg <- "Business Core"
+combine_deltas(prg)
+list_plo(prg)
+```
+
+- Most of external assessment outcomes are above their targets by near 20% margin. BUS 9 - ability to work collaboratively, measured through CPC Exam Organizational Behavior - is somewhat lower.
+- Likewise, most of internal assessment outcomes are well above their targets, although the variations are much larger than those of external assessments.
+- BUS 1 (overall knowledge, measured by CPC Exam score) and BUS 2 (ability of information technology and literacy) may need updates on their targets or re-evaluate the assessments.
+- In contrast, BUS 8 (ability to evaluate diversity variables) is exceptionally low and barely passed the target level.
+- Note that BUS 10 target level has been updated to 90% rather than 70%, eliminating 'excess' level of achievement.
+
+```{r}
+prg <- "Economics"
+combine_deltas(prg)
+list_plo(prg)
+```
+
+- Note that external ECO 3-5 use the same assessment tool, namely CPC test scores on quantitative research and statistics; also note that internal ECO 1 has no assessment this cycle.
+- Both internal and external ECO 3 (ability form research questions with quantitative methods to answer) and ECO 4 (ability to evaluate information and data) have outcomes much higher than the target. Re-evaluations of those targets and/or assessments might be needed.
+- ECO 5 (ability to communicate empirical analysis results) shows relatively less achievement in the internal assessment.
+- In contrast, ECO 2 (macroeconomic analysis) shows only moderate success in the external and falls short in the internal assessment outcome. This unique disparity calls for an attention. It might be a sign that the knowledge of macroeconomics is not well translated into an application of it.
+
+
+```{r}
+prg <- "Finance"
+combine_deltas(prg)
+list_plo(prg)
+```
+
+
+
+```{r}
+prg <- "Human Resources Management"
+combine_deltas(prg)
+list_plo(prg)
+```
+
+
+
+```{r}
+prg <- "Management"
+combine_deltas(prg)
+list_plo(prg)
+```
+
+
+```{r}
+prg <- "Marketing"
+combine_deltas(prg)
+list_plo(prg)
+```
+
+
+```{r}
+prg <- "MBA"
+combine_deltas(prg)
+list_plo(prg)
+```
 
 Next
 ================================================================================
+Start preparing for the reports to share during the department meeting(s). Gather different analyses for each program.

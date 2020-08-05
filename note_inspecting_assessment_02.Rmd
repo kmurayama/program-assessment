@@ -1,0 +1,545 @@
+---
+title: "Note to Inspect Assessment Data 2"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  word_document:
+    toc: yes
+    reference_docx: template02.docx
+  html_notebook:
+    toc: yes
+    toc_float:
+      collapsed: yes
+    code_folding: hide
+  pdf_document:
+    toc: yes
+    fig_height: 5
+    fig_width: 5
+    df_print: kable
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+    df_print: paged
+    code_folding: hide
+    fig_height: 7
+    fig_width: 7
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+timeh <- 4
+timew <- 4
+```
+
+Introduction
+================================================================================
+
+Objective
+--------------------------------------------------------------------------------
+Combine the graphs and tables for presentation. During the department meeting(s), faculty members will gather in groups according to their specialties. Gather relevant information to help their analysis and discussion to create the strategic plans.
+
+Data
+--------------------------------------------------------------------------------
+Main data file has been updated. Now the mapping worksheet separates internal and external assessments, aligned wit the data worksheet.
+```{r load}
+path <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\WIP\\"
+asm <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Sheet0")
+asm_map <- read_excel(paste0(path, "Assessment Data Main.xlsx"), "Mapping")
+```
+```{r munge}
+asm <- asm %>%
+  mutate(int_delta = internal_outcome - internal_target,
+         ext_delta = external_outcome - external_target)
+asm <- asm %>% mutate(ay_internal_n = paste0(ay, '\nN = ', internal_n), 
+                      ay_external_n = paste0(ay, '\nN = ', external_n))
+prgs <- c("Accounting", "Business Core", "Economics", "Finance",
+          "Human Resources Management", "Management", "Marketing",
+          "MIS", "MBA")
+```
+
+Analysis
+================================================================================
+```{r functions1}
+draw_from_mapping <- function(plo_map){
+  # Feed in information about the assessment into the graph
+  # By default use a row in the mapping
+  # For use like:
+  #out <- draw_from_mapping(asm_map[i, ])
+  i_plo <- plo_map$plo
+  i_type <- plo_map$type
+  int_tool <- plo_map$internal_tool
+  ext_tool <- plo_map$external_tool
+  
+  # Make titles
+  title <- paste(i_plo, i_type, collapse = " ")
+  int_title <- paste(title, "Internal", collapse = " ")
+  ext_title <- paste(title, "External", collapse = " ")
+  int_subtitle <- paste("Assessment Tool:", int_tool)
+  ext_subtitle <- paste("Assessment Tool:", ext_tool)
+  
+  # Draw subsample from the dataset
+  x <- asm %>% filter(plo == i_plo, type == i_type) 
+  # Check for empty cases, then make plot(s)
+  int_p <- NULL
+  ext_p <- NULL
+  if (nrow(x)!=0){
+    # Check for empty cases (PLO can have internal or external or both)
+    if(int_tool != "NA"){
+      int_p <- draw_graph(x, "Internal", int_title, int_subtitle)
+      int_p <- int_p + ggthemes::theme_fivethirtyeight(base_size = 8)
+    }
+    if(ext_tool != "NA"){
+      ext_p <- draw_graph(x, "External", ext_title, ext_subtitle)
+      ext_p <- ext_p + ggthemes::theme_fivethirtyeight(base_size = 8)
+    }
+    out <- list(x, int_p, ext_p)
+    names(out) <- c(title, int_subtitle, ext_subtitle)
+    return(out)
+  } else{
+    return(NULL)
+  }
+}
+#draw_from_mapping(asm_map[1, ])
+
+draw_graph <- function(x,  ori = c("External", "Internal"),
+                       title, subtitle){
+  # Draw time series plot of assessment outcomes
+  # Individual PLO rather than a whole program is used
+  ori <- match.arg(ori)
+  
+  if(nrow(x) == 0){return(NULL)}
+  if(ori == "Internal"){
+    ay <- "ay_internal_n"
+    outcome <- "internal_outcome"
+    target <- "internal_target"
+    n <- "internal_n"
+  } else if (ori == "External"){
+    ay <- "ay_external_n"
+    outcome <- "external_outcome"
+    target <- "external_target"
+    n <- "external_n"
+  } else {
+    return(NULL)
+  }
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_line(aes(group = 1), na.rm = TRUE) +
+    geom_point(na.rm = TRUE) +
+    geom_hline(aes_string(yintercept = target),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p <- p +
+    labs(title = title, subtitle = subtitle) +
+    ylab("Outcome") + xlab("Academic Year\nSample Size")
+  p
+}
+#draw_graph(asm %>% filter(plo == "BUS 1"), ori = "Internal", title = "", subtitle = "") + ggthemes::theme_fivethirtyeight(base_size = 8)
+```
+```{r functions2}
+draw_corr <- function(prg, ty = c("Summative", "Formative", "Both")){
+  type <- match.arg(ty)
+  # Select samples and 
+  if (ty == "Both"){
+    x <- asm %>% filter(program == prg)
+  } else {
+    x <- asm %>% filter(program == prg, type == ty)
+  }
+  if (all(is.na(x$external_outcome)) |
+      all(is.na(x$internal_outcome))){
+    return(NULL)}
+  
+  title <- paste(prg, type, "External vs Internal")
+  subtitle <- "Assessment outcomes are plotted to each other\nRed point is the 2019 result"
+  
+  p <- ggplot(x, aes(internal_outcome, external_outcome)) +
+    geom_path(linetype = "longdash", na.rm = TRUE) +
+    geom_point(aes(color = ay == 2019), na.rm = TRUE) +
+    scale_color_manual(values = c("black", "red")) +
+    #geom_text(aes(label = ay), size = 3, nudge_x = 0.03, na.rm = TRUE) +
+    geom_hline(aes(yintercept = external_target), color = "red", alpha = 0.5) +
+    geom_vline(aes(xintercept = internal_target), color = "red", alpha = 0.5)
+  p <- p +
+    facet_wrap(vars(plo))
+  p + 
+    labs(title = title, subtitle = subtitle) +
+    xlab("Internal Assessment Outcomes") +
+    ylab("External Assessment Outcomes") +
+    scale_x_continuous(breaks = 1:10/10,
+                       labels=scales::percent_format(accuracy = 5L)) +
+    scale_y_continuous(breaks = 1:10/10,
+                       labels=scales::percent_format(accuracy = 5L)) +
+    coord_cartesian(xlim = c(0.5, 1.01), ylim = c(0.5, 1.01)) +
+    theme(legend.position = "none", aspect.ratio = 1)
+    #theme(plot.title = element_text(size = 10),
+    #      plot.subtitle = element_text(size = 8),
+    #      legend.position = "none", aspect.ratio = 1)
+}
+#draw_corr("Accounting", "Summative")
+
+list_plo <- function(prg){
+  asm_map %>% filter(program == prg) %>%
+    select(plo, description, ends_with("tool_description")) %>%
+    knitr::kable()
+}
+draw_delta <- function(prg, yr = 2019, ori = c("External", "Internal")){
+  type <- match.arg(ori)
+  
+  if (ori == "External"){
+    delta <- "ext_delta"
+  } else {
+    delta <- "int_delta"
+  }
+  
+  title <- paste(prg, ori, "Deltas for", yr)
+  subtitle <- "Differences between target achievements and actual outcomes"
+  
+  x <- asm %>% filter(program == prg, ay == yr)
+  p <- ggplot(x, aes_string("plo", delta)) +
+    geom_col(na.rm = TRUE) +
+    geom_hline(yintercept = c(-0.2, 0.2), color = "red", alpha = 0.5) +
+    geom_hline(yintercept = 0.0, color = "black", alpha = 0.4)
+  p <- p + coord_flip()
+  p + ggthemes::theme_fivethirtyeight() +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L)) +
+    labs(title = title, subtitle = subtitle) +
+    theme(plot.title = element_text(size = 8),
+          plot.subtitle = element_text(size = 6),
+          legend.position = "none")
+}
+#draw_delta("Business Core", ori = "External")
+#draw_delta("Business Core", ori = "Internal")
+
+combine_deltas <- function(prg, yr = 2019){
+  p1 <- draw_delta(prg, yr, "External")
+  p2 <- draw_delta(prg, yr, "Internal")
+  gridExtra::grid.arrange(p1, p2, ncol = 2)
+}
+```
+```{r functions3}
+draw_time <- function(lo, ori = c("External", "Internal"),
+                      typ = c("Summative", "Formative")){
+  ori <- match.arg(ori)
+  typ <- match.arg(typ) 
+  if (ori == "External"){
+    outcome <- "external_outcome"
+    target <- "external_target"
+    ay <- "ay_external_n"
+  } else {
+    outcome <- "internal_outcome"
+    target <- "internal_target"
+    ay <- "ay_internal_n"
+  }
+  x <- asm %>% filter(plo == lo, type == typ)
+  if (all(is.na(x$external_outcome)) |
+      all(is.na(x$internal_outcome))){
+    return(NULL)}
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_line(aes(group = 1), na.rm = TRUE) +
+    geom_point(na.rm = TRUE) +
+    geom_hline(aes_string(yintercept = target),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p + ggthemes::theme_fivethirtyeight()
+  p
+}
+combine_time <- function(lo, typ){
+  x <- asm_map %>% filter(plo == lo, type == typ)
+  title <- paste(lo, typ, "Assessment Outcomes")
+  title <- paste0(title,
+                  str_sub(paste0("\n(", x %>% pull(description)), 1, 50), "...)" )
+  p1 <- draw_time(lo, "Internal", typ)
+  p2 <- draw_time(lo, "External", typ)
+  if (is.null(p1) & is.null(p2)){
+    return(NULL)
+  }
+  if (is.null(p1)){
+    p1 <- ggplot() + theme_void()
+  } else{
+    p1 <- p1 +
+      ylab("Internal") +
+      xlab("Academic Year\nSample Size") +
+      theme(plot.title = element_blank(),
+            plot.subtitle = element_blank(),
+            axis.title.x = element_blank(),
+            legend.position = "none")
+  }
+  if (is.null(p2)){
+    p2 <- ggplot() + theme_void()
+  } else{
+    p2 <- p2 +
+      ylab("External") +
+      xlab("Academic Year\nSample Size") +
+      theme(plot.title = element_blank(),
+            plot.subtitle = element_blank(),
+            axis.title.x = element_blank(),
+            legend.position = "none")
+  }
+  gridExtra::grid.arrange(p1, p2, ncol = 1, top = title)
+}
+```
+
+Accounting
+--------------------------------------------------------------------------------
+```{r, fig.width=timew, fig.height=timeh}
+prg <- "Accounting"
+lplo <- asm_map %>% filter(program == prg) %>% pull(plo)
+ltyp <- asm_map %>% filter(program == prg) %>% pull(type)
+for (i in 1:length(lplo)){
+  combine_time(lplo[i], ltyp[i])
+}
+```
+
+```{r}
+asm_map %>% filter(program == prg) %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r}
+draw_corr(prg, "Summative")
+```
+
+- Both achievement levels remain high and pass the target levels.
+- Movements are mostly (except for ACC 1) contained with in 20% ranges.
+- However, common trends are toward lower internal assessment
+
+```{r}
+combine_deltas(prg)
+```
+
+- External assessments 1-4 are the same measure (CPC Exam Accounting score). The outcome is well beyond the target level.
+- All the four internal goals have been achieved with significant margins. ACC 2 - compare the impact of alternative costing methods - might need to update the target.
+
+Business Core
+--------------------------------------------------------------------------------
+```{r, fig.width=timew, fig.height=timeh}
+prg <- "Business Core"
+lplo <- asm_map %>% filter(program == prg) %>% pull(plo)
+ltyp <- asm_map %>% filter(program == prg) %>% pull(type)
+for (i in 1:length(lplo)){
+  combine_time(lplo[i], ltyp[i])
+}
+```
+
+```{r}
+asm_map %>% filter(program == prg) %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r}
+draw_corr(prg, "Summative")
+```
+
+- BUS 1 Summative is measured through Peregrine CPC test. Since external measures the average and internal measures the distribution of final scores, they naturally have a strong positive correlation.
+- Almost all PLOs improved in external assessment outcomes, while remained about the same in internal assessment outcomes.
+- Exceptionally, BUS 5 analysis of business situations have shown a significant improvement in the internal assessment.
+
+```{r}
+combine_deltas(prg)
+```
+
+- Most of external assessment outcomes are above their targets by near 20% margin. BUS 9 - ability to work collaboratively, measured through CPC Exam Organizational Behavior - is somewhat lower.
+- Likewise, most of internal assessment outcomes are well above their targets, although the variations are much larger than those of external assessments.
+- BUS 1 (overall knowledge, measured by CPC Exam score) and BUS 2 (ability of information technology and literacy) may need updates on their targets or re-evaluate the assessments.
+- In contrast, BUS 8 (ability to evaluate diversity variables) is exceptionally low and barely passed the target level.
+- Note that BUS 10 target level has been updated to 90% rather than 70%, eliminating 'excess' level of achievement.
+
+Economics
+--------------------------------------------------------------------------------
+```{r, fig.width=timew, fig.height=timeh}
+prg <- "Economics"
+lplo <- asm_map %>% filter(program == prg) %>% pull(plo)
+ltyp <- asm_map %>% filter(program == prg) %>% pull(type)
+for (i in 1:length(lplo)){
+  combine_time(lplo[i], ltyp[i])
+}
+```
+
+```{r}
+asm_map %>% filter(program == prg) %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r}
+draw_corr(prg, "Summative")
+```
+
+- Lacks consistent observations (either internal or external, or both, are missing).
+- Some improvements in external assessment outcomes (ECO 3 ability to form research questions, ECO 4 information/data literacy).
+
+```{r}
+combine_deltas(prg)
+```
+
+- Note that external ECO 3-5 use the same assessment tool, namely CPC test scores on quantitative research and statistics; also note that internal ECO 1 has no assessment this cycle.
+- Both internal and external ECO 3 (ability form research questions with quantitative methods to answer) and ECO 4 (ability to evaluate information and data) have outcomes much higher than the target. Re-evaluations of those targets and/or assessments might be needed.
+- ECO 5 (ability to communicate empirical analysis results) shows relatively less achievement in the internal assessment.
+- In contrast, ECO 2 (macroeconomic analysis) shows only moderate success in the external and falls short in the internal assessment outcome. This unique disparity calls for an attention. It might be a sign that the knowledge of macroeconomics is not well translated into an application of it.
+
+
+Finance
+--------------------------------------------------------------------------------
+```{r, fig.width=timew, fig.height=timeh}
+prg <- "Finance"
+lplo <- asm_map %>% filter(program == prg) %>% pull(plo)
+ltyp <- asm_map %>% filter(program == prg) %>% pull(type)
+for (i in 1:length(lplo)){
+  combine_time(lplo[i], ltyp[i])
+}
+```
+
+```{r}
+asm_map %>% filter(program == prg) %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r}
+draw_corr(prg, "Summative")
+```
+
+- While both FIN 1 and 2 improved in external assessment outcomes over time, FIN 2 suffered from a lower outcome in FIN 2.
+- Note, however, the internal assessment has been done by different set of instructors in 2019 and no internal structure (i.e. rubric rows) is available. So, this change might be attributed to different grading practices.
+
+```{r}
+combine_deltas(prg)
+```
+
+Human Resources Management
+--------------------------------------------------------------------------------
+```{r, fig.width=timew, fig.height=timeh}
+prg <- "Human Resources Management"
+lplo <- asm_map %>% filter(program == prg) %>% pull(plo)
+ltyp <- asm_map %>% filter(program == prg) %>% pull(type)
+for (i in 1:length(lplo)){
+  combine_time(lplo[i], ltyp[i])
+}
+```
+
+```{r}
+asm_map %>% filter(program == prg) %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r}
+draw_corr(prg, "Summative")
+```
+
+- Internal assessment outcomes in 2019 have declined significantly largely due to the renewed standards.
+- External assessment outcomes had moderate fluctuations, but improved to remain above the target level.
+
+```{r}
+combine_deltas(prg)
+```
+
+Management
+--------------------------------------------------------------------------------
+```{r, fig.width=timew, fig.height=timeh}
+prg <- "Management"
+lplo <- asm_map %>% filter(program == prg) %>% pull(plo)
+ltyp <- asm_map %>% filter(program == prg) %>% pull(type)
+for (i in 1:length(lplo)){
+  combine_time(lplo[i], ltyp[i])
+}
+```
+
+```{r}
+asm_map %>% filter(program == prg) %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r}
+draw_corr(prg, "Summative")
+```
+
+```{r}
+combine_deltas(prg)
+```
+
+Marketing
+--------------------------------------------------------------------------------
+```{r, fig.width=timew, fig.height=timeh}
+prg <- "Marketing"
+lplo <- asm_map %>% filter(program == prg) %>% pull(plo)
+ltyp <- asm_map %>% filter(program == prg) %>% pull(type)
+for (i in 1:length(lplo)){
+  combine_time(lplo[i], ltyp[i])
+}
+```
+
+```{r}
+asm_map %>% filter(program == prg) %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r}
+draw_corr(prg, "Summative")
+```
+
+```{r}
+combine_deltas(prg)
+```
+
+MIS
+--------------------------------------------------------------------------------
+```{r, fig.width=timew, fig.height=timeh}
+prg <- "MIS"
+lplo <- asm_map %>% filter(program == prg) %>% pull(plo)
+ltyp <- asm_map %>% filter(program == prg) %>% pull(type)
+for (i in 1:length(lplo)){
+  combine_time(lplo[i], ltyp[i])
+}
+```
+
+```{r}
+asm_map %>% filter(program == prg) %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r}
+draw_corr(prg, "Summative")
+```
+
+```{r}
+combine_deltas(prg)
+```
+
+MBA
+--------------------------------------------------------------------------------
+```{r, fig.width=timew, fig.height=timeh}
+prg <- "MBA"
+lplo <- asm_map %>% filter(program == prg) %>% pull(plo)
+ltyp <- asm_map %>% filter(program == prg) %>% pull(type)
+for (i in 1:length(lplo)){
+  combine_time(lplo[i], ltyp[i])
+}
+```
+
+```{r}
+asm_map %>% filter(program == prg) %>%
+  select(plo, description, ends_with("tool_description")) %>%
+  knitr::kable()
+```
+
+```{r}
+draw_corr(prg, "Summative")
+```
+
+- Formative assessments only consist of internal assessments.
+- Summative *internal* assessment outcomes for 2019 (comp exam) need to be provided.
+
+```{r}
+combine_deltas(prg)
+```
+
+Next
+================================================================================
