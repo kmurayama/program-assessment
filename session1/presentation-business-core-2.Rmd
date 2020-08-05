@@ -31,18 +31,25 @@ success.
 
 --
 
-i.e. Past and Data &rarr; Future and Strategy.
+**i.e. Past and Data &rarr; Future and Strategy.**
 
 ---
 
-# Assessment Visualization
+# Assessment?
+
+## Assessment Structure
+
+- Program Goals
+- Program Learning Objectives
+- (Course Objectives)
+- Assessment/Rubric
 
 ## Examples of Data Types
 
 |            | Internal | External |
 |---|---|---|
 | Formative  | MBA Final Exams | |
-| Summative  | Sig. Assignmnets | CPC Exams |
+| Summative  | Sig. Assignments | CPC Exams |
 |---|---|---|
 | Indirect  |                  | Survey    |
 
@@ -408,7 +415,7 @@ draw_corr2(lo, typ) + geom_text(aes(label = ay), nudge_x = 0.05)
 Plot of internal vs external assessment outcomes over time.
 ]
 .pull-right[
-What am I seeing?
+**What am I seeing?**
 
 - Red point shows the combination of internal and external assessment outcomes for the academic year 2019: 85% Internal & 80% External
 - Other dots show the combinations over time: 2018, 2017, and 2016, following the broken line
@@ -433,7 +440,7 @@ draw_corr2(lo, typ) + annotate("segment", x = 0.50, xend = 0.85, y = 0.63, yend 
 Plot of internal vs external assessment outcomes over time.
 ]
 .pull-right[
-What do I get out of this picture?
+**What do I get out of this picture?**
 
 - Overall trend from bottom-left to upper-right: From 2016 to 2019, both the external and internal assessment outcomes have improved
 - Rather flat line: However, the change in the internal assessment outcomes have been overwhelmingly strong
@@ -459,7 +466,7 @@ draw_corr2(lo, typ)
 Plot of internal vs external assessment outcomes over time.
 ]
 .pull-right[
-So what?
+**So what?**
 
 Let's suppose 
 1. the external assessments measure basic knowledge of students (e.g. what does A mean?), while
