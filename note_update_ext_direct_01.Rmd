@@ -1,0 +1,533 @@
+---
+title: "Note to Update External Direct 01"
+date: "8/19/2020"
+output:
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: yes
+    code_folding: hide
+    df_print: paged
+  html_notebook:
+    code_folding: hide
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+library(knitr)
+library(lubridate)
+get_os <- function(){
+  sysinf <- Sys.info()
+  if (!is.null(sysinf)){
+  os <- sysinf['sysname']
+  if (os == 'Darwin')
+    os <- "osx"
+  } else { ## mystery machine
+    os <- .Platform$OS.type
+    if (grepl("^darwin", R.version$os))
+      os <- "osx"
+    if (grepl("linux-gnu", R.version$os))
+      os <- "linux"
+  }
+  tolower(os)
+}
+datapath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+```
+
+Objective
+================================================================================
+Make external direct (Peregrine CPC) graphs for ACBSP presentation.
+Also, move the process from an existing project.
+
+- [ ] Add total scores to external
+- [ ] Add break down of BUS assessments
+
+Data
+================================================================================
+Import the database both for outcomes and mapping.
+```{r load, cache=TRUE}
+asm <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Outcome")
+asm_map <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Mapping")
+
+asm <- asm %>%
+  mutate(int_delta = internal_outcome - internal_target,
+         ext_delta = external_outcome - external_target)
+asm <- asm %>% mutate(ay_internal_n = paste0(ay, '\nN = ', internal_n), 
+                      ay_external_n = paste0(ay, '\nN = ', external_n))
+```
+
+External Direct Project Old Code
+--------------------------------------------------------------------------------
+Bring code from external-direct project.
+
+Import individual data and benchmark scores.
+```{r}
+fn <- "External Direct Comparison//IndividualResults_UND.xlsx"
+x1 <- read_excel(paste0(datapath, fn), sheet = 2, skip = 5)
+fn <- "External Direct Comparison//IndividualResults_MBA.xlsx"
+x2 <- read_excel(paste0(datapath, fn), sheet = 2, skip = 5)
+x3 <- bind_rows(x1, x2)
+names(x3)[1] <- "ID"
+
+fn <- "External Direct Comparison//External Direct Comparison.xlsx"
+ref <- read_excel(paste0(datapath, fn), "Both")
+names(ref) <- c("Course", "Timeline", "Score", "ACBSP_US", "ACBSP_R2", "US",
+                "MSCHE", "Public", "Degree")
+# keys <- read_excel("data/Key mappings for Peregrine exams.xlsx")
+```
+
+Create variables, reshape data set, and merge benchmark score data.
+```{r}
+mdf <- x3 %>% select(-(Learner:`Student ID`)) # Remove private information
+mdf <- mdf %>%
+  mutate(
+    Time = ymd_hms(Completed),
+    AY = case_when(
+      Time %within% interval(ymd("2016-06-01"), ymd("2017-05-31")) ~ "2016",
+      Time %within% interval(ymd("2017-06-01"), ymd("2018-05-31")) ~ "2017",
+      Time %within% interval(ymd("2018-06-01"), ymd("2019-05-31")) ~ "2018",
+      Time %within% interval(ymd("2019-06-01"), ymd("2020-05-31")) ~ "2019",
+      TRUE ~ "Other"),
+    Major = `Identify Your Major or Concentration`,
+    Minor = `Identify Your Minor or Certificate`,
+    Specialization = `MBA Specialization`,
+    Degree = Program)
+
+# Filter entries with less than 30 min spent
+mdf.original <- mdf
+mdf <- mdf %>% filter(`Duration (min)` > 30)
+
+# Reshape the data
+lmdf <- mdf %>% select(-c(Timeline, Faculty, Course)) %>% 
+  pivot_longer(cols = c(Accounting:`Final Score`),
+               names_to = "Course", values_to = "Score")
+# Merge the benchmark scores and compute differences
+lmdf <- lmdf %>%
+  left_join(ref %>% select(Course, ACBSP_US, ACBSP_R2, US, Degree),
+            by = c("Degree", "Course")) %>% 
+  mutate(Diff = Score - US)
+# Name has changed 2019 for *General Business* to *ISBC* (along with the program
+# change). Count them together.
+lmdf <- lmdf %>%
+  mutate(Major = str_replace(Major,"Interdisciplinary Studies in Business and Commerce", "General Business"),
+         Degree = str_replace(Degree, "BS", "UND"))
+```
+
+Generate outcome table.
+```{r}
+# Aggregate: All students
+tbl1 <- lmdf %>% group_by(Degree, AY, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>%
+  mutate(Major = "All", Specialization = "All")
+# Disaggregate: By major
+tbl2 <- lmdf %>% filter(Degree == "UND") %>% 
+  group_by(AY, Major, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>% 
+  mutate(Degree = "UND")
+# Disaggregate: By specialization
+tbl3 <- lmdf %>% filter(Degree == "MBA") %>% 
+  group_by(AY, Specialization, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>% 
+  mutate(Degree = "MBA")
+tbl_all <- bind_rows(tbl1, tbl2, tbl3)
+# tbl_all %>% filter(!is.na(Specialization))
+```
+
+Using the mapping, extract relevant information.
+```{r}
+lres <- list()
+for(i in c(1:nrow(asm_map))){
+  # Selectors
+  course <- asm_map[[i, "external_tool"]]
+  degree <- asm_map[[i, "degree"]]
+  major <- asm_map[[i, "external_group"]]
+  # Identifier
+  program <- asm_map[[i, "program"]]
+  plo <- asm_map[[i, "plo"]]
+  # Populate the list by extracting
+  if(course != "NA"){
+    lres[[i]] <- tbl_all %>%
+      filter(Degree == degree, Major == major, Course == course) %>%
+      select(AY, Degree, Major, Course, n, mean, met) %>% 
+      mutate(Program = program, PLO = plo)
+  }
+}
+x4 <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
+x4 %>% knitr::kable(dig = 2)
+```
+
+
+Update
+--------------------------------------------------------------------------------
+Now, add the requested: breakdown of BUS 1-10 by majors.
+```{r, eval=FALSE}
+disag_map <- asm_map %>% filter(program == "Business Core")
+lres <- list()
+majors <- levels(as.factor(asm_map$external_group))
+majors <- str_replace(majors, "All", "General Business") # Sub group
+for(i in c(1:nrow(disag_map))){
+  # Selectors
+  course <- disag_map[[i, "external_tool"]]
+  degree <- disag_map[[i, "degree"]]
+  for (major in majors){
+    if (major != "NA"){
+      # Identifier
+      program <- major # Disaggregated data for that target group
+      plo <- disag_map[[i, "plo"]]
+      # Populate the list by extracting
+      if(course != "NA"){
+        lres[[paste(course, major)]] <- tbl_all %>%
+          filter(Degree == degree, Major == major, Course == course) %>%
+          select(AY, Degree, Major, Course, n, mean, met) %>% 
+          mutate(Program = program, PLO = plo)
+      }
+    }
+  }
+}
+x5 <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
+x5 %>% knitr::kable(dig = 2)
+# write_csv(x3 , "quicktable.csv")
+```
+
+This can be simplified. Updated the database to distinguish "core" and programs. Simplify codes.
+
+- Add a distinction between "Core" and else (e.g. Business Core and MBA shall use all the students in the degree)
+- For Core, in addition to outcomes at all the student, add breakdown results by students' major
+- Moreover, add a "control group" of all the students in non-core assessments as well
+
+First, modify the above using the "Core" indicator.
+
+Note that "General Business" is placed in `external_tool` column, so that those who are in that concentration shall be measured in the `all_tbl` above.
+Here, instead, we shall measure both "All the students" and the breakdown by major/concentrations.
+
+    Detected an issue combining UND and MBA data. Column 5-7 mismatch. MBA students have specialization instead of (or additionally to) majors. **Somewhat ad hoc, but combine "Major" for UND and "Specialization" for MBA.** Update it retrospectively.
+
+Given this change, I can simply pull all the `Course` used in core assessments. Mapping data set does not have any additional info anyway.
+```{r}
+tbl_all %>% filter(Course %in% (asm_map %>% filter(core) %>% pull(external_tool))) %>% kable(dig = 2)
+```
+
+Now add the control group.
+```{r}
+lres <- list()
+for(i in c(1:nrow(asm_map))){
+  # Selectors
+  course <- asm_map[[i, "external_tool"]]
+  degree <- asm_map[[i, "degree"]]
+  major <- asm_map[[i, "external_group"]]
+  control <- asm_map[[i, "external_control_group"]]
+  # Identifier
+  program <- asm_map[[i, "program"]]
+  plo <- asm_map[[i, "plo"]]
+  # Populate the list by extracting
+  if(course != "NA"){
+    z1 <- tbl_all %>%
+      filter(Degree == degree, Major == major, Course == course) %>%
+      select(AY, Degree, Major, Course, n, mean, met) %>% 
+      mutate(Program = program, PLO = plo)
+    z2 <- tbl_all %>%
+      filter(Degree == degree, Major == control, Course == course) %>%
+      select(Control = Major, n_ctrl = n, mean_ctrl = mean, met_contrl = met)
+    lres[[i]] <- left_join(z1, z2, by = c("AY", "Degree"))
+  }
+}
+x4 <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
+kable(x4, dig=2)
+```
+
+
+Target can be placed easily. They are in the data set at the individual level, but lost while aggregating (i.e. summarize). I can reintroduce them either through taking the mean of them all together or join them again.
+```{r}
+# Align values
+ref <- ref %>% mutate(Degree = str_replace(Degree, "BS", "UND"))
+tbl_all2 <- tbl_all %>%
+  left_join(ref %>% select(Course, ACBSP_US, ACBSP_R2, US, MSCHE, Public, Degree),
+            by = c("Degree", "Course")) %>% 
+  mutate(across(ACBSP_US:Public, ~.x/100))
+# head(tbl_all2)
+```
+
+The rest is the same as before.
+```{r}
+# With a tweak. Drop "NA" rows.
+asm_map2 <- asm_map %>% filter(course != "NA")
+
+lres <- list()
+for(i in c(1:nrow(asm_map2))){
+  # Selectors
+  course <- asm_map2[[i, "external_tool"]]
+  degree <- asm_map2[[i, "degree"]]
+  major <- asm_map2[[i, "external_group"]]
+  # Identifier
+  program <- asm_map2[[i, "program"]]
+  plo <- asm_map2[[i, "plo"]]
+  # Populate the list by extracting
+  z1 <- tbl_all2 %>%
+    filter(Degree == degree, Major == major, Course == course) %>%
+    select(AY, Degree, Major, Course, n, mean, met, US) %>% 
+    mutate(Program = program, PLO = plo)
+  z2 <- tbl_all %>%
+    filter(Degree == degree, Major == control, Course == course) %>%
+    select(Control = Major, n_ctrl = n, mean_ctrl = mean, met_contrl = met)
+  lres[[i]] <- left_join(z1, z2, by = c("AY", "Degree"))
+}
+x4 <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
+x4 %>% knitr::kable(dig = 2)
+```
+
+Lastly, the breakdown can be retrieved simply by `core` indicator.
+```{r}
+x5 <- tbl_all %>%
+  filter(Course %in% (asm_map %>% filter(core) %>% pull(external_tool)))
+x5 %>% kable(dig = 2)
+```
+
+Graph with New Tables
+--------------------------------------------------------------------------------
+The PLO specific outcomes (`x4`) can be fed into the database file manually, as done before, although it would be nice if done automatically... In contrast, the breakdown by major does not have a good place. Save it separately, perhaps.
+
+It might be easier to manage them if I store them in smaller, multiple files. Then combine the results into a single file in a separate step.
+
+Anyway, it's possible to experiment with the data frames at hand with trivial changes to the existing function.
+```{r}
+draw_time <- function(x, outcome, ay="AY", tgt="US", ttl="Title", subt="Sub", ctrl = "_ctrl"){
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_line(aes(group = 1), na.rm = TRUE) +
+    geom_point(size = 2, na.rm = TRUE) +
+    geom_hline(aes_string(yintercept = tgt),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    geom_line(aes_string(x = ay, y = paste0(outcome, ctrl), group = "1"), na.rm = TRUE, linetype = "dashed") +
+    geom_point(aes_string(x = ay, y = paste0(outcome, ctrl)), size = 2, na.rm = TRUE) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p <- p +
+    labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    theme(plot.title = element_blank(),
+          plot.subtitle = element_blank(),
+          axis.title.x = element_blank(),
+          legend.position = "none") +
+    ggthemes::theme_fivethirtyeight(base_size = 8)
+  p
+}
+
+draw_time(x4 %>% filter(Major == "Accounting", Course == "Accounting"), "mean")
+```
+
+This can be done easily if the data is in long format.
+```{r}
+lx4 <- pivot_longer(x4, cols = c("mean", "mean_ctrl"),
+                     names_to = "Ctrl", values_to = "mean") %>% 
+  mutate(AY = paste0(AY, "\n(n=", n, ")\n(N=", n_ctrl, ")"))
+```
+
+
+```{r}
+draw_time <- function(x, outcome, ay="AY", tgt="US", ttl="Title", subt="Sub", ctrl = "_ctrl"){
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_hline(aes_string(yintercept = tgt),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    geom_line(aes(group = Ctrl, linetype = Ctrl), na.rm = TRUE) +
+    geom_point(aes(group = Ctrl, shape = Ctrl), size = 2, na.rm = TRUE) +
+    scale_shape_manual(values = c(16, 1)) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p <- p +
+    labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    theme(plot.title = element_blank(),
+          plot.subtitle = element_blank(),
+          axis.title.x = element_blank(),
+          legend.position = "none") +
+    ggthemes::theme_fivethirtyeight(base_size = 8)
+  p
+}
+
+# draw_time(lx4 %>% filter(Major == "Accounting", Course == "Accounting"), "mean")
+# draw_time(lx4 %>% filter(PLO == "ACC 1"), "mean")
+```
+
+```{r}
+map_draw_time <- function(lo, ori = c("External", "Internal"),
+                          typ = c("Summative", "Formative")){
+  # Create a graph based on attributes
+  # Data are drawn from `asm` data frame (previously computed values)
+  ori <- match.arg(ori)
+  typ <- match.arg(typ) 
+  if (ori == "External"){
+    # outcome <- "external_outcome"
+    outcome <- "mean"
+    target <- "external_target"
+    ay <- "ay_external_n"
+    tool <- asm_map %>% filter(plo == lo) %>%
+      pull(external_tool_description)
+    grp <- asm_map %>% filter(plo == lo) %>%
+      pull(external_group)
+    # x <- asm %>% filter(plo == lo, type == typ)
+    x <- lx4 %>% filter(PLO == lo)
+    # if (all(is.na(x$external_outcome))){
+    #   return(NULL)}
+  } else {
+    outcome <- "internal_outcome"
+    target <- "internal_target"
+    ay <- "ay_internal_n"
+    tool <- asm_map %>% filter(plo == lo) %>%
+      pull(internal_tool_description)
+    grp <- asm_map %>% filter(plo == lo) %>%
+      pull(internal_group)
+    x <- asm %>% filter(plo == lo, type == typ)
+    if (all(is.na(x$internal_outcome))){
+      return(NULL)}
+  }
+  ttl <- paste(lo, ori, typ)
+  subt <- paste0("Tool: ", tool, "\nGroup: ", grp)
+  
+  draw_time(x, outcome, ttl = ttl, subt = subt)
+}
+# map_draw_time("ACC 1", "External", "Summative")
+# map_draw_time("BUS 1", "External", "Summative")
+# map_draw_time("MGT 1", "External", "Summative")
+# map_draw_time("HRM 4", "External", "Summative")
+```
+
+Results are actually interesting... I can also use other kinds of plots by defining `draw_xxx` functions in the same format. For instance, differences: Especially because they are not longitudinal, it is reasonable to focus on differences rather than changes over time.
+
+Finally, use `x5` to plot breakdown of business core.
+For the time plot, I should have a target and control when possible. They make the inference much easier as I just found out. Combining the control group outcomes is one way, but it could be easier. After all, the data set is complete: all combinations of `Course` and `Major` are available. I can make it into a short format and then select relevant rows. Selected rows can be turned into a long format. (Wait, can I do that for `tbl_all`?)
+
+Spent 2 hours to do all the data manipulation, then ended up realizing I didn't need to do any of that...
+
+```{r}
+draw_time <- function(x, outcome, ay="AY", tgt="US", ttl="Title", subt="Sub", ctrl = "_ctrl"){
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_hline(aes_string(yintercept = tgt),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    geom_line(aes(group = Major, linetype = Major), na.rm = TRUE) +
+    geom_point(aes(group = Major, shape = Major), size = 2, na.rm = TRUE) +
+    scale_shape_manual(values = c(16, 1)) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p <- p +
+    labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    theme(plot.title = element_blank(),
+          plot.subtitle = element_blank(),
+          axis.title.x = element_blank(),
+          legend.position = "none") +
+    ggthemes::theme_fivethirtyeight(base_size = 8)
+  p
+}
+
+x5ref <- x5 %>%
+  left_join(ref %>% select(Course, ACBSP_US, ACBSP_R2, US, MSCHE, Public, Degree),
+            by = c("Degree", "Course")) %>% 
+  mutate(across(ACBSP_US:Public, ~.x/100))
+
+# x <- x5ref %>% filter(Degree == "UND", str_detect(Major, "Accounting|All"), Course == "Final Score")
+# draw_time(x, "mean")
+
+```
+
+Extra step needed for sample size to be displayed with AY. Other than that, pretty much the same as in the existing function.
+```{r}
+lo <- "BUS 1"
+ori <- "External"
+typ <- "Summative"
+tool <- asm_map %>% filter(plo == lo) %>% pull(external_tool_description)
+grp <- "Accounting" # Here's the difference
+ctrl <- "All"
+ttl <- paste(lo, ori, typ)
+subt <- paste0("Tool: ", tool, "\nGroup: ", grp)
+x <- x5ref %>% filter(Degree == "UND",
+                      str_detect(Major, paste0(grp, "|", ctrl)),
+                      Course == "Final Score")
+AYn <- x %>% select(Degree, AY, Major, n) %>%
+  pivot_wider(id_cols = c("Degree", "AY"),
+              names_from = "Major",
+              values_from = "n") %>%
+  mutate(AYn = paste0(AY, "\n(n=", Accounting, ")\n(N=", All, ")")) %>%
+  ungroup() %>%
+  select(AY, AYn)
+
+draw_time(left_join(x, AYn, by = "AY"), "mean", ay = "AYn", ttl = ttl, subt = subt)
+```
+
+It's inconvenient that I need to manually specify the Major name.
+If the "Control" group sample size is in a separate column, it's straight forward though... That brings me back to some tedious data manipulation.
+
+Note, however, the long format is convenient for time plot, while it is necessary to have output and "control" output in separate columns for other types of plots. Keep them that way by default.
+
+```{r}
+ctrl <- x5 %>% filter(Major == "All") %>% select(-mean_diff) %>% 
+  rename(Major_ctrl = Major, Specialization_ctrl = Specialization,
+         mean_ctrl = mean, n_ctrl = n, met_ctrl = met)
+x5ref <- x5 %>% select(-mean_diff) %>% 
+  left_join(ctrl, by = c("Degree", "AY", "Course")) %>% 
+  left_join(ref %>% select(Course, ACBSP_US, ACBSP_R2, US, MSCHE, Public, Degree),
+            by = c("Degree", "Course")) %>% 
+  mutate(across(ACBSP_US:Public, ~.x/100),
+         AYn = paste0(AY, "\n(n=", n, ")\n(N=", n_ctrl, ")"))
+```
+```{r}
+# For time plot
+lx5ref <- x5ref %>%
+  select(Degree:mean, Major:mean_ctrl, US, AYn) %>% 
+  pivot_longer(cols = starts_with("mean"),
+                       names_to = "Type",
+                       values_to = "mean")
+
+# Update group varialbe name accordingly
+draw_time <- function(x, outcome, ay="AY", grp = "Type", tgt="US", ttl="Title", subt="Sub"){
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_hline(aes_string(yintercept = tgt),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    geom_line(aes_string(group = grp, linetype = grp), na.rm = TRUE) +
+    geom_point(aes_string(group = grp, shape = grp), size = 2, na.rm = TRUE) +
+    scale_shape_manual(values = c(16, 1)) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p <- p +
+    labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    theme(plot.title = element_blank(),
+          plot.subtitle = element_blank(),
+          axis.title.x = element_blank(),
+          legend.position = "none") +
+    ggthemes::theme_fivethirtyeight(base_size = 8)
+  p
+}
+
+
+# Set up
+lo <- "BUS 1"
+ori <- "External"
+typ <- "Summative"
+tool <- asm_map %>% filter(plo == lo) %>% pull(external_tool_description)
+grp <- "Accounting" # Here's the difference
+ctrl <- "All"
+ttl <- paste(lo, ori, typ)
+subt <- paste0("Tool: ", tool, "\nGroup: ", grp)
+
+# Select for plot
+x <- lx5ref %>% filter(Degree == "UND", Major == "Accounting",
+                      Course == "Final Score")
+
+draw_time(x, "mean", ay = "AYn", ttl = ttl, subt = subt)
+```
+
+This is analogous to how lx4 was treated. So, this function can be used right away.
+```{r}
+names(lx4)
+draw_time(lx4 %>% filter(PLO == "ACC 1"), "mean", ay = "AY", grp = "Ctrl")
+
+```
+

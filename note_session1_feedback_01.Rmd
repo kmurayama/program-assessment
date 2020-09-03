@@ -1,0 +1,558 @@
+---
+title: "Note to Reflect Feedback after 1st Session 01"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc_float:
+      collapsed: yes
+    code_folding: hide
+    df_print: paged
+  html_notebook:
+    toc: yes
+    toc_float:
+      collapsed: yes
+    code_folding: hide
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+library(knitr)
+get_os <- function(){
+  sysinf <- Sys.info()
+  if (!is.null(sysinf)){
+  os <- sysinf['sysname']
+  if (os == 'Darwin')
+    os <- "osx"
+  } else { ## mystery machine
+    os <- .Platform$OS.type
+    if (grepl("^darwin", R.version$os))
+      os <- "osx"
+    if (grepl("linux-gnu", R.version$os))
+      os <- "linux"
+  }
+  tolower(os)
+}
+# wippath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\WIP\\"
+datapath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+```
+
+Objective
+================================================================================
+Reflect feedback from Session 1 discussions into the report. Some requested new or different presentations. Some pointed out changes or errors in specifications.
+
+Data
+================================================================================
+
+```{r load, cache=TRUE}
+asm <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Outcome")
+asm_map <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Mapping")
+
+asm <- asm %>%
+  mutate(int_delta = internal_outcome - internal_target,
+         ext_delta = external_outcome - external_target)
+asm <- asm %>% mutate(ay_internal_n = paste0(ay, '\nN = ', internal_n), 
+                      ay_external_n = paste0(ay, '\nN = ', external_n))
+```
+
+Feedback, Requests, and Responses
+================================================================================
+
+From Beth (Aug 6)
+--------------------------------------------------------------------------------
+
+> ... Is it possible for you to post the FULL internal and comparison data sets (all students, all majors) for the CPC data and internal for all students all majors in one report? I realize the n for the internal data will be smaller, as Mark didn't report everything, but I think that we need to look at the full CPC set somehow. I know that you have the data, I'm just not sure where to locate it and in which report...
+
+Some ambiguity in what's asked. So, let's break it down.
+
+1. BUS 1 Internal Assessment is supposed to use *all* business major - i.e. not just the general business/ICBSP students - to measure the achievement prevalence. I made a mistake in this while copy'n'paste results into the 'database' file.
+2. Internal for all students can only be the students who took BUS 499. That must be much smaller. Some assignments are missing as well. I've explained that to her.
+3. Does she mean all the topics and all the sample groups for CPC by "FULL internal and comparison data sets"?
+
+So,
+
+- [x] Update the database
+- [ ] Include the sample group identification in reports
+- [ ] Update ACBSP table
+- [ ] Eventually, I can include the 2019 report generating codes in this project
+
+In a follow up email,
+
+> How about just doing ALL students who took the CPC and ALL students who took BUS499?  That is really going to be the most useful for ACBSP (probably need very little less than what you've already prepared.
+
+Perhaps she still thinks the program reports are disaggregated by major. While I have disaggregated CPC, I didn't provide them since 1) Ahmet provided that and 2) they are not asked for in program assessments. If she is referring to disaggregation of BUS 499 results, the sample is too small and I omitted in the presentation.
+
+From Beth (Aug 7)
+--------------------------------------------------------------------------------
+
+> Sorry to take so long to get back to you. I think I've been so bonkers that I don't always make sense.
+> 
+> What I meant was that we need to interleave Ahmet's CPC charts with the ones we have.
+> 
+> I was thinking of presentation flow
+> 
+> External, direct: Overall CPC (just the totals and a trend line--he has those)
+> Internal, direct: Overall Departmental LO1 (you have those--LO1 = CPC)
+> Internal, indirect: LO1 from the survey (you have that).
+> Follow that with the LO1 charts we already have
+> 
+> Then we can use the other LO survey charts and follow them with samples from each major (accounting, etc.).
+> 
+> I also want a way to show those amazing difference charts as well as the trend lines. That's where the real analysis is. The report graphics are powerful. I just need to think of way to morph their silly spread sheet. Maybe Sion could take a look and advise on the esthetics. All the data is there, but is just gets lost on the ACBSP spreadsheet. BUT we can control that.
+> 
+> I need to not think about this for a day or so. We are so very close!
+
+It's much clearer now. I tried to explain as follows:
+
+> I have all the CPC outcomes ready. I didn’t share them all since the count will be huge (~100 graphs or so?). Also, please don’t restrict your ideas to fit apparent technical restrictions. We can solve them rather easily. So, I’ll try to follow what you think is the best unconditional on restrictions.
+> 
+> By the way, this is the reason I made a number of “notes” to share. It’s harder to tweak these ideas once we put them into reports (e.g. ACBSP spreadsheet), so I experiment different ideas in interactive ways. (Similar to agile development philosophy and tools for it have been developed more recently.) Let me provide you some mock up and you can comment on it like in your last email, then I’ll address them. Does this sound good?
+
+Let's try to address the requests. First, sort out the ideas. List combinations of factors. Hand draw outcomes. Then, for each case, make a mock up. Finally, share the results.
+
+In the presentation, I used a flow of past - present via trends and snapshot. Beth wants something different. She wants a flow from aggregate to individual objectives. Moreover, she wants to incorporate the difference charts, but not yet clear how it can be incorporated consistently.
+
+The main restriction here is that ACBSP spreadsheet is strictly linear in presentation. In order to narrate the multidimensional story in such a linear presentation, I need to have an additional dimension.
+
+Also, difference charts does not need to be a cross-section, snapshot. It can show aggregation as a static picture.
+
+Coding idea: Use html table in output. I have Beth's input already in the Excel, so import it as a data. Move them around as needed and output as a table, including the graphs. It'll be easy to move things around and export.
+
+Ideas:
+
+- Combine internal/external within each LO as in the presentation.
+- Additional column(s) for graphs, breaking the strictly linear, single path.
+- Group program LOs and add a header row with additional analyses.
+
+### Try out a table output
+First, read (a copy of) the current Figure 4.2.
+```{r}
+fig42 <- read_excel(paste0(datapath, "Program Assessment\\fig42.xlsx"), "copy0809")
+```
+
+The `goal`, `tool`, and `result` columns are generated from the database spreadsheet. It's easy to purse them out. Use the type information to identify each row. Assessment used for multiple PLOs (e.g. ECO 3-5 external) can be identified with just one of the PLOs and later put back the label.
+```{r}
+fig42 <- fig42 %>% mutate(type = str_extract(tool, "Summative|Formative"),
+                          ori = str_extract(tool, "External|Internal"),
+                          plo = str_extract(id, "[A-Z]{3} \\d{1,2}"))
+```
+
+Now, try to produce a simple graph using the ID info.
+```{r}
+draw_time <- function(lo, ori = c("External", "Internal"),
+                      typ = c("Summative", "Formative")){
+  # Create a graph based on attributes
+  # Data are drawn from `asm` data frame (previously computed values)
+  ori <- match.arg(ori)
+  typ <- match.arg(typ) 
+  if (ori == "External"){
+    outcome <- "external_outcome"
+    target <- "external_target"
+    ay <- "ay_external_n"
+    tool <- asm_map %>% filter(plo == lo) %>%
+      pull(external_tool_description)
+    grp <- asm_map %>% filter(plo == lo) %>%
+      pull(external_group)
+    x <- asm %>% filter(plo == lo, type == typ)
+    if (all(is.na(x$external_outcome))){
+      return(NULL)}
+  } else {
+    outcome <- "internal_outcome"
+    target <- "internal_target"
+    ay <- "ay_internal_n"
+    tool <- asm_map %>% filter(plo == lo) %>%
+      pull(internal_tool_description)
+    grp <- asm_map %>% filter(plo == lo) %>%
+      pull(internal_group)
+    x <- asm %>% filter(plo == lo, type == typ)
+    if (all(is.na(x$internal_outcome))){
+      return(NULL)}
+  }
+  ttl <- paste(lo, ori, typ)
+  subt <- paste0("Tool: ", tool, "\nGroup: ", grp)
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_line(aes(group = 1), na.rm = TRUE) +
+    geom_point(size = 2, na.rm = TRUE) +
+    geom_hline(aes_string(yintercept = target),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p <- p +
+    labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    theme(plot.title = element_blank(),
+          plot.subtitle = element_blank(),
+          axis.title.x = element_blank(),
+          legend.position = "none") +
+    ggthemes::theme_fivethirtyeight(base_size = 8)
+  p
+}
+```
+
+Then, make a table.
+```{r outtable, fig.show="hide", eval=FALSE}
+lres <- list()
+
+x <- fig42[1, ]
+lres[[1]] <- draw_time(x$plo, x$ori, x$type)
+invisible(lapply(lres, print))
+
+if (!interactive()) {
+  out <- cbind(
+    x[1, 1:6],
+    table = sprintf("![](%s%s-%s.png)",
+                    opts_current$get("fig.path"),
+                    opts_current$get("label"),
+                    1:length(lres))
+    )
+  kable(out)
+}
+```
+
+
+
+### Try out flow 1
+Follow Beth's suggestion.
+
+> External, direct: Overall CPC (just the totals and a trend line--he has those)
+> Internal, direct: Overall Departmental LO1 (you have those--LO1 = CPC)
+> Internal, indirect: LO1 from the survey (you have that).
+> Follow that with the LO1 charts we already have
+
+Keep the simple linear flow. I need to clarify it though.
+
+- External LO1 is the average total score of ISBC students.
+- Internal LO1 is the prevalence of achievements of all the business students.
+
+So, I suppose she wants some measure (average?) of total score of (probably) all the business students for "external direct" assessment (also, what does "the totals" refer to in "the totals AND a trend line"? something that is not shown in the trend line?), wants to use the external LO1 as the internal direct of the aggregate assessment (how reasoned?); and I don't know what "LO1 from the survey" means (some of outcome questions perhaps? how is it internal?).
+
+Difference charts can be put for each program. Say, I group rows by program and place a header. That row can host a different type of information such as the difference graph.
+
+Use the output csv file for Peregrine results (at least for now) rather than computing them from scratch. Ahmet's graph is too complicated to read from R.
+```{r}
+ext <- read_csv(paste0(datapath, "Program Assessment//Peregrine.csv"))
+```
+```{r}
+x1 <- ext %>% filter(Major == "All", Course == "Final Score")
+x2 <- ext %>% filter(Major == "General Business", Course == "Final Score")
+  
+# First
+titl <- "Overall External, Direct Assessment"
+subt <- "Average Total Score of Peregrine CPC Exam, All Business Students"
+p1 <- ggplot(x1, aes(AY, mean)) +
+  geom_line(aes(group = 1), na.rm = TRUE) +
+  geom_point(size = 2, na.rm = TRUE) +
+  scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+p1 <- p1 +
+  labs(title = titl, subtitle = subt) +
+  xlab("Academic Year\nSample Size") +
+  theme(plot.title = element_blank(),
+        plot.subtitle = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none") +
+  ggthemes::theme_fivethirtyeight(base_size = 6)
+
+# Second
+titl <- "Overall Internal, Direct Assessment"
+subt <- "Average Total Score of Peregrine CPC Exam, ISBC Students"
+p2 <- ggplot(x2, aes(AY, mean)) +
+  geom_line(aes(group = 1), na.rm = TRUE) +
+  geom_point(size = 2, na.rm = TRUE) +
+  scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+p2 <- p2 +
+  labs(title = titl, subtitle = subt) +
+  xlab("Academic Year\nSample Size") +
+  theme(plot.title = element_blank(),
+        plot.subtitle = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none") +
+  ggthemes::theme_fivethirtyeight(base_size = 6)
+# p1
+# p2
+```
+
+
+```{r test, fig.height=2, fig.width=3.5, fig.show="hide", eval=FALSE}
+# Print graphs 'silently'
+lres <- list()
+lres[[1]] <- p1
+lres[[2]] <- p2
+
+x <- fig42[1, ]
+lres[[3]] <- draw_time(x$plo, x$ori, x$type)
+invisible(lapply(lres, print))
+
+r1 <- data.frame(matrix(rep("", 6), 1, 6))
+r2 <- data.frame(matrix(rep("", 6), 1, 6))
+names(r1) <- names(r2) <- names(x[, 1:6])
+
+x <- bind_rows(r1, r2, x[, 1:6])
+
+# Make rows
+if (!interactive()) {
+  out <- cbind(
+    x,
+    table = sprintf("![](%s%s-%s.png)",
+                    opts_current$get("fig.path"),
+                    opts_current$get("label"),
+                    1:length(lres))
+    )
+  kable(out)
+}
+```
+
+Looks good, though there's some issue with copy and paste into Excel. Graphic sizes for non-R generated graphics are not supported. Perhaps I need to copy graphs manually...
+
+Now, save graphs then make a table.
+
+```{r}
+lres <- list()
+for(i in 1:nrow(asm_map)){
+  x <- asm_map[i, ]
+  lres[[paste(x$plo, "External", x$type)]] <- draw_time(x$plo, "External", x$type)
+  lres[[paste(x$plo, "Internal", x$type)]] <- draw_time(x$plo, "Internal", x$type)
+}
+```
+
+
+```{r}
+dir.create("fig")
+ggsave("fig/dept1.png", p1, height = 2, width = 3.5, units = "in")
+ggsave("fig/dept2.png", p2, height = 2, width = 3.5, units = "in")
+lfig <- lapply(names(lres),
+               function(x) {
+                 fn <- paste0("fig/", x, ".png")
+                 ggsave(fn, lres[[x]], height = 2, width = 3.5, units = "in")
+                 return(fn)
+                 }
+               )
+```
+
+Then put them into table.
+```{r out, fig.height=2, fig.width=3.5, fig.show="hide"}
+lres <- list()
+
+r1 <- data.frame(matrix(rep("", 9), 1, 9))
+r2 <- data.frame(matrix(rep("", 9), 1, 9))
+names(r1) <- names(r2) <- names(fig42)
+
+r1 <- cbind(r1, table = "![](fig/dept1.png)")
+r2 <- cbind(r2, table = "![](fig/dept2.png)")
+
+lres[[1]] <- r1
+lres[[2]] <- r2
+
+for (i in 1:nrow(fig42)){
+  x <- fig42[i, ]
+  lres[[i + 2]] <- cbind(x,
+                     table = sprintf("![](fig/%s %s %s.png)",
+                                     x$plo, x$ori, x$type)
+                     )
+}
+out <- bind_rows(lres)
+```
+
+```{r}
+kable(out[1:10, ])
+```
+
+Data sources are all over the place. Will need to consolidate them.
+
+### Try out flow 2
+It would be much more compact if adding columns to separate formative/summative assessments.
+
+```{r}
+out.backup <- out
+summative <- fig42 %>% filter(type == "Summative")
+formative <- fig42 %>% filter(type == "Formative")
+dim(summative)
+dim(formative)
+names(fig42)
+```
+
+Easier done manually...? I want to try different layout *possible* in Excel.
+
+Something I need in addition is the delta graph for external/internal. Wait, it's done that already. Get from presentation document.
+
+```{r}
+draw_delta <- function(prg, yr = 2019, ori = c("External", "Internal")){
+  type <- match.arg(ori)
+  
+  if (ori == "External"){
+    delta <- "ext_delta"
+  } else {
+    delta <- "int_delta"
+  }
+  
+  title <- paste(prg, ori, "Deltas for", yr)
+  subtitle <- "Differences between target achievements and actual outcomes"
+  
+  x <- asm %>% filter(program == prg, ay == yr)
+  p <- ggplot(x, aes_string("plo", delta)) +
+    geom_col(na.rm = TRUE) +
+    geom_hline(yintercept = c(-0.2, 0.2), color = "red", alpha = 0.5) +
+    geom_hline(yintercept = 0.0, color = "black", alpha = 0.4)
+  p +
+    labs(title = title, subtitle = subtitle) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L),
+                       breaks = -5:5/10) +
+    ggthemes::theme_fivethirtyeight(base_size = 8) +
+    theme(legend.position = "none")
+}
+combine_deltas <- function(prg, yr = 2019){
+  p1 <- draw_delta(prg, yr, "External")
+  p2 <- draw_delta(prg, yr, "Internal")
+  gridExtra::grid.arrange(p1, p2, ncol = 2)
+}
+p1 <- draw_delta("Business Core", 2019, "External")
+p2 <- draw_delta("Business Core", 2019, "Internal")
+```
+
+
+```{r, eval=FALSE}
+ggsave("fig/delta-bus-ext.png", p1, height = 2, width = 3.5, units = "in")
+ggsave("fig/delta-bus-int.png", p2, height = 2, width = 3.5, units = "in")
+```
+
+From Beth (Aug 14)
+--------------------------------------------------------------------------------
+Talked with Beth, having clarified several things.
+
+- [x] Add counts and US average to "overall" graph
+- [ ] Add total scores to external
+- [ ] Add break down of BUS assessments
+- [x] Come up with good names for breakdown measures for majors
+- [ ] Add survey graphs to goals
+
+First, let's unify the old and new graph procedures, by separating graph drawing and mapping.
+```{r}
+draw_time <- function(x, ay, outcome, ttl, subt){
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_line(aes(group = 1), na.rm = TRUE) +
+    geom_point(size = 2, na.rm = TRUE) +
+    # geom_hline(aes_string(yintercept = target),
+    #            alpha = 0.4, color = "red", na.rm = TRUE) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p <- p +
+    labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    theme(plot.title = element_blank(),
+          plot.subtitle = element_blank(),
+          axis.title.x = element_blank(),
+          legend.position = "none") +
+    ggthemes::theme_fivethirtyeight(base_size = 8)
+  p
+}
+
+x1 <- ext %>% filter(Major == "All", Course == "Final Score")
+titl <- "Overall External, Direct Assessment"
+subt <- "Average Total Score of Peregrine CPC Exam, All Business Students"
+draw_time(x1, "AY", "mean", titl, subt)
+```
+
+
+```{r}
+map_draw_time <- function(lo, ori = c("External", "Internal"),
+                          typ = c("Summative", "Formative")){
+  # Create a graph based on attributes
+  # Data are drawn from `asm` data frame (previously computed values)
+  ori <- match.arg(ori)
+  typ <- match.arg(typ) 
+  if (ori == "External"){
+    outcome <- "external_outcome"
+    target <- "external_target"
+    ay <- "ay_external_n"
+    tool <- asm_map %>% filter(plo == lo) %>%
+      pull(external_tool_description)
+    grp <- asm_map %>% filter(plo == lo) %>%
+      pull(external_group)
+    x <- asm %>% filter(plo == lo, type == typ)
+    if (all(is.na(x$external_outcome))){
+      return(NULL)}
+  } else {
+    outcome <- "internal_outcome"
+    target <- "internal_target"
+    ay <- "ay_internal_n"
+    tool <- asm_map %>% filter(plo == lo) %>%
+      pull(internal_tool_description)
+    grp <- asm_map %>% filter(plo == lo) %>%
+      pull(internal_group)
+    x <- asm %>% filter(plo == lo, type == typ)
+    if (all(is.na(x$internal_outcome))){
+      return(NULL)}
+  }
+  ttl <- paste(lo, ori, typ)
+  subt <- paste0("Tool: ", tool, "\nGroup: ", grp)
+  
+  draw_time(x, ay, outcome, ttl, subt)
+}
+map_draw_time("ACC 1", "External", "Summative")
+```
+
+Add counts.
+```{r}
+x1 <- ext %>% filter(Major == "All", Course == "Final Score")
+x1 <- x1 %>% mutate(AY = paste0(AY, "\nn=", n))
+
+titl <- "Overall External, Direct Assessment"
+subt <- "Average Total Score of Peregrine CPC Exam, All Business Students"
+p1 <- draw_time(x1, "AY", "mean", titl, subt)
+p1
+```
+
+Add US average. The data needs to be pulled.
+```{r}
+ext_path <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\External Direct Comparison\\"
+usavg <- read_excel(paste0(ext_path, "External Direct Comparison.xlsx"))
+names(usavg) <- c("Course", "Timeline", "Score", "ACBSP_US", "ACBSP_R2", "US", "MSCHE", "Public", "Degree")
+
+# This is merged to the outcomes derived from individual results in ext-direct
+# Here, I only need one...
+trg <- usavg %>% filter(Course == "Final Score", Degree == "BS") %>% pull(US)
+x1 <- x1 %>% mutate(target = trg/100)
+
+```
+
+```{r}
+target <- "target"
+p1 <- draw_time(x1, "AY", "mean", titl, subt) + 
+    geom_hline(aes_string(yintercept = target),
+               alpha = 0.4, color = "red", na.rm = TRUE)
+p1
+```
+
+Add totals to external. Probably easier if I just update the data source since I need to run a loop.
+
+Add disaggregation by Majors. First, internal disaggregation is done in the presentation. The presentation is similar to the delta graph since we do not have data for the past years to disaggregate. Even with 2019, the sample sizes are limited.
+```{r, eval=FALSE}
+# Run int_prepare.R if not available
+disag <- readRDS("../out/disag.Rds")
+disag <- disag %>% mutate(PLO = paste0("BUS ", PLO, "\nn=", n))
+draw_disag <- function(prg){
+  title <- paste("Business Core Outcome for", prg, "Majors")
+  p <- ggplot(disag %>% filter(Major == prg), aes(factor(PLO), Met - 0.7)) +
+    geom_col()
+  p + 
+    labs(title = title) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L),
+                       breaks = -5:5/10) +
+    ggthemes::theme_fivethirtyeight(base_size = 8) +
+    theme(legend.position = "none")
+  
+}
+# draw_disag("Marketing")
+```
+
+~~Second, Peregrine disaggregation is already done and stored in "Peregrine.csv." So, I just need to map them to appropriate criteria.~~ No, it's not. That is the file containing data after filtering and mapping, so breakdown of final score is not available. I better revisit the external-direct project and have the functions here.
+
+Survey graphs are done in `survey` project. This needs to be revisited as well.
+
+Next
+================================================================================
+I shall address the remaining requests. Better start a new note(s). Put some efforts to simplify data sources. It's all over the place.
+
+- Note to Update External Direct 01
+- Note to Update Internal Indirect 01
+- (Note to Update Internal Direct 01 ?)

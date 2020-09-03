@@ -1,12 +1,7 @@
 ---
-title: "Note to Produce ACBSP Standard 4 Items"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+title: "Record: Produce ACBSP Standard 4 Items"
+date: "8/6/2020"
 output:
-  html_notebook:
-    toc: yes
-    toc_float:
-      collapsed: yes
-    code_folding: hide
   html_document:
     toc: yes
     toc_float:
@@ -141,6 +136,7 @@ lp_int[[11]] + ggthemes::theme_fivethirtyeight()
 ggsave("test.png", lp_int[[11]], height = 2, width = 3.5, units = "in")
 ```
 ```{r, eval=FALSE, include=FALSE}
+dir.create("fig")
 lapply(names(lp_int),
        function(x) ggsave(paste0("fig/", x, "_int.png"), lp_int[[x]],
                           height = 2, width = 3.5, units = "in"))

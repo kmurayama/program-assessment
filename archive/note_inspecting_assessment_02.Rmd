@@ -1,20 +1,7 @@
 ---
 title: "Note to Inspect Assessment Data 2"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+date: "8/6/2020"
 output:
-  word_document:
-    toc: yes
-    reference_docx: template02.docx
-  html_notebook:
-    toc: yes
-    toc_float:
-      collapsed: yes
-    code_folding: hide
-  pdf_document:
-    toc: yes
-    fig_height: 5
-    fig_width: 5
-    df_print: kable
   html_document:
     toc: yes
     toc_float:

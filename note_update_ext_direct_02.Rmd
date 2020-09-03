@@ -1,0 +1,348 @@
+---
+title: "Note to Update External Direct 02"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_notebook:
+    code_folding: hide
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: yes
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+library(knitr)
+library(lubridate)
+datapath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+```
+
+Objective
+================================================================================
+Make external direct (Peregrine CPC) graphs for ACBSP presentation.
+Also, move the process from an existing project.
+
+- [ ] Add total scores to external
+- [ ] Add break down of BUS assessments
+
+Data
+================================================================================
+Database and Mapping
+--------------------------------------------------------------------------------
+```{r load}
+asm <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Outcome")
+asm_map <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Mapping")
+
+asm <- asm %>%
+  mutate(int_delta = internal_outcome - internal_target,
+         ext_delta = external_outcome - external_target)
+asm <- asm %>% mutate(ay_internal_n = paste0(ay, '\nN = ', internal_n), 
+                      ay_external_n = paste0(ay, '\nN = ', external_n))
+```
+
+Individual Peregrine to Summary
+--------------------------------------------------------------------------------
+Import individual data and benchmark scores.
+```{r}
+fn <- "External Direct Comparison//IndividualResults_UND.xlsx"
+x1 <- read_excel(paste0(datapath, fn), sheet = 2, skip = 5)
+fn <- "External Direct Comparison//IndividualResults_MBA.xlsx"
+x2 <- read_excel(paste0(datapath, fn), sheet = 2, skip = 5)
+x3 <- bind_rows(x1, x2)
+names(x3)[1] <- "ID"
+
+fn <- "External Direct Comparison//External Direct Comparison.xlsx"
+ref <- read_excel(paste0(datapath, fn), "Both")
+names(ref) <- c("Course", "Timeline", "Score", "ACBSP_US", "ACBSP_R2", "US",
+                "MSCHE", "Public", "Degree")
+# keys <- read_excel("data/Key mappings for Peregrine exams.xlsx")
+```
+
+Create variables, reshape data set, and merge benchmark score data.
+```{r}
+mdf <- x3 %>% select(-(Learner:`Student ID`)) # Remove private information
+mdf <- mdf %>%
+  mutate(
+    Time = ymd_hms(Completed),
+    AY = case_when(
+      Time %within% interval(ymd("2016-06-01"), ymd("2017-05-31")) ~ "2016",
+      Time %within% interval(ymd("2017-06-01"), ymd("2018-05-31")) ~ "2017",
+      Time %within% interval(ymd("2018-06-01"), ymd("2019-05-31")) ~ "2018",
+      Time %within% interval(ymd("2019-06-01"), ymd("2020-05-31")) ~ "2019",
+      TRUE ~ "Other"),
+    Major = `Identify Your Major or Concentration`,
+    Minor = `Identify Your Minor or Certificate`,
+    Specialization = `MBA Specialization`,
+    Degree = Program)
+
+# Filter entries with less than 30 min spent
+mdf.original <- mdf
+mdf <- mdf %>% filter(`Duration (min)` > 30)
+
+# Reshape the data
+lmdf <- mdf %>% select(-c(Timeline, Faculty, Course)) %>% 
+  pivot_longer(cols = c(Accounting:`Final Score`),
+               names_to = "Course", values_to = "Score")
+# Merge the benchmark scores and compute differences
+# Need this at this stage in order to summarize prevelence of achievements
+lmdf <- lmdf %>%
+  left_join(ref %>% select(Course, ACBSP_US, ACBSP_R2, US, Degree),
+            by = c("Degree", "Course")) %>% 
+  mutate(Diff = Score - US)
+
+# Name has changed 2019 for *General Business* to *ISBC* (along with the program
+# change). Count them together.
+lmdf <- lmdf %>%
+  mutate(Major = str_replace(Major,"Interdisciplinary Studies in Business and Commerce", "General Business"),
+         Degree = str_replace(Degree, "BS", "UND"))
+```
+
+Aggregate by different level (all business major, by major, by specialization).
+```{r}
+# Aggregate: All students
+tbl1 <- lmdf %>% group_by(Degree, AY, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>%
+  mutate(Major = "All", Specialization = "All")
+# Disaggregate: By major
+tbl2 <- lmdf %>% filter(Degree == "UND") %>% 
+  group_by(AY, Major, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>% 
+  mutate(Degree = "UND")
+# Disaggregate: By specialization
+tbl3 <- lmdf %>% filter(Degree == "MBA") %>% 
+  group_by(AY, Specialization, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>% 
+  mutate(Degree = "MBA")
+tbl_all <- bind_rows(tbl1, tbl2, tbl3)
+# tbl_und <- bind_rows(tbl1 %>% select(-Specialization), tbl2)
+# tbl_mba <- bind_rows(tbl2 %>% select(-Major), tbl3)
+
+# Re-introduce benchmark. Use only US.
+ref <- ref %>% mutate(Degree = str_replace(Degree, "BS", "UND"))
+tbl_all <- tbl_all %>%
+  left_join(ref %>% select(Degree, Course, US),
+            by = c("Degree", "Course")) %>% 
+  mutate(US = US/100)
+
+# names(tbl_und); names(tbl_mba)
+```
+
+Outcome Table
+--------------------------------------------------------------------------------
+
+### Program Level Assessment
+Using the mapping, extract relevant information.
+```{r}
+
+# With a tweak. Drop "NA" rows.
+# asm_map2 <- asm_map %>% filter(course != "NA")
+
+# Extract relevant rows from the outcome summary
+# while adding the identification information
+lres <- list()
+for(i in c(1:nrow(asm_map))){
+  # Selectors
+  course <- asm_map[[i, "external_tool"]]
+  degree <- asm_map[[i, "degree"]]
+  major <- asm_map[[i, "external_group"]]
+  control <- asm_map[[i, "external_control_group"]]
+  # Identifier
+  program <- asm_map[[i, "program"]]
+  plo <- asm_map[[i, "plo"]]
+  # Populate the list by extracting
+  z1 <- tbl_all %>%
+    filter(Degree == degree, Major == major, Course == course) %>%
+    select(AY, Degree, Major, Course, n, mean, met, US) %>% 
+    mutate(Program = program, PLO = plo)
+  z2 <- tbl_all %>%
+    filter(Degree == degree, Major == control, Course == course) %>%
+    select(Control = Major, n_ctrl = n, mean_ctrl = mean, met_contrl = met)
+  lres[[i]] <- left_join(z1, z2, by = c("AY", "Degree"))
+}
+x4 <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
+# x4 %>% knitr::kable(dig = 2)
+```
+
+### Core Level Assessment
+Business Core assessment for each majors. First, result rows relevant. This will contain results for all business majors or MBA and by major/specialization. Then, separate the outcomes by all the business majors or MBA. Finally, 'glue' them to relevant rows (identified by degree and course/topic).
+```{r}
+x5 <- tbl_all %>%
+  filter(Course %in% (asm_map %>% filter(core) %>% pull(external_tool)))
+# x5 %>% kable(dig = 2)
+
+ctrl <- x5 %>% filter(Major == "All") %>% select(-US) %>% 
+  rename(Major_ctrl = Major, Specialization_ctrl = Specialization,
+         mean_ctrl = mean, n_ctrl = n, met_ctrl = met, met_diff_ctrl = mean_diff)
+x5ref <- x5 %>% select(-mean_diff) %>% 
+  left_join(ctrl, by = c("Degree", "AY", "Course"))
+```
+
+Export Output Table
+--------------------------------------------------------------------------------
+Lastly export the output table for other use.
+
+```{r, eval=FALSE}
+write_csv(x4, "out/ext-program-assessment.csv")
+write_csv(x5ref, "out/ext-core-assessment.csv")
+```
+
+
+Graph
+================================================================================
+Set Up Time Plot
+--------------------------------------------------------------------------------
+
+For time plot, a long format is more suited.
+```{r}
+lx4 <- pivot_longer(x4, cols = c("mean", "mean_ctrl"),
+                     names_to = "Type", values_to = "mean") %>% 
+  mutate(AYn = paste0(AY, "\n(n=", n, ")\n(N=", n_ctrl, ")"))
+lx5ref <- x5ref %>%
+  mutate(AYn = paste0(AY, "\n(n=", n, ")\n(N=", n_ctrl, ")")) %>% 
+  select(Degree:mean, Major:mean_ctrl, US, AYn) %>% 
+  pivot_longer(cols = starts_with("mean"),
+                       names_to = "Type",
+                       values_to = "mean")
+```
+
+```{r}
+draw_time <- function(x, outcome,
+                      ay="AY", grp = "Type", tgt="US",
+                      ttl="Title", subt="Sub"){
+  # Draw time plot. 
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_hline(aes_string(yintercept = tgt),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    geom_line(aes_string(group = grp, linetype = grp), na.rm = TRUE) +
+    geom_point(aes_string(group = grp, shape = grp), size = 2, na.rm = TRUE) +
+    scale_shape_manual(values = c(16, 1), labels = c("Focus", "All Business")) +
+    scale_linetype(labels = c("Focus", "All Business")) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p <- p +
+    labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    ggthemes::theme_fivethirtyeight(base_size = 7) +
+    theme(legend.position = "right", legend.direction = "vertical")
+  p
+}
+```
+
+
+```{r, eval=FALSE}
+# Test
+lo <- "BUS 1"
+ori <- "External"
+typ <- "Summative"
+stgrp <- "Accounting" # For student group
+tool <- asm_map %>% filter(plo == lo) %>% pull(external_tool_description)
+
+ttl <- paste(lo, ori, typ)
+subt <- paste0("Assessment Tool: ", tool, "\nFocus Group: ", stgrp)
+
+# Select for plot
+x <- lx5ref %>% filter(Degree == "UND", Major == stgrp,
+                      Course == "Final Score")
+
+draw_time(x, "mean", ay = "AYn", ttl = ttl, subt = subt)
+draw_time(x, "mean", ay = "AYn", ttl = ttl, subt = subt) + scale_y_continuous(limits = c(0.5, 1))
+
+# Test 2 (Graph for lx4 or program level assessment still works)
+draw_time(lx4 %>% filter(PLO == "ACC 1"), "mean", ay = "AYn", grp = "Type")
+```
+
+```{r}
+map_draw_time <- function(x, lo, ay,
+                          stgrp = NULL, crs = NULL,
+                          xmap = asm_map,
+                          dgr = c("UND", "MBA"),
+                          typ = c("Summative", "Formative")){
+  dgr <- match.arg(dgr)
+  typ <- match.arg(typ)
+  # Usig LO as a key, retrieve information from the mapping
+  tool <- asm_map %>% filter(plo == lo, type == "Summative") %>% pull(external_tool_description)
+  if(is.null(stgrp)){
+    stgrp <- asm_map %>% filter(plo == lo, type == "Summative") %>% pull(external_group)
+  } else{
+    stgrp <- stgrp
+  }
+  if(is.null(crs)){
+    crs <- asm_map %>% filter(plo == lo, type == "Summative") %>% pull(external_tool)
+  } else{
+    crs <- crs
+  }
+  
+  if(dgr == "UND"){
+    x0 <- x %>% filter(Degree == dgr, Course == crs, Major == stgrp)
+  } else{
+    x0 <- x %>% filter(Degree == dgr, Course == crs, Specialization == stgrp)
+  }
+  
+  ttl <- paste(lo, "External", typ)
+  subt <- paste0("Assessment Tool: ", tool, "\nFocus Group(Major/Specialization): ", stgrp)
+  if(!is.na(crs)){
+    draw_time(x = x0, outcome = "mean", ay = ay, ttl = ttl, subt = subt)
+  } else{
+    return(NULL)
+  }
+
+}
+```
+
+
+```{r, eval=FALSE}
+# Test
+map_draw_time(x = lx4, lo = "ACC 1", ay = "AYn", dgr = "UND")
+map_draw_time(x = lx5ref, lo = "BUS 1", stgrp = "Accounting", ay = "AYn", dgr = "UND")
+map_draw_time(x = lx5ref, lo = "MBA 1", stgrp = "General MBA", ay = "AYn", dgr = "MBA")
+```
+
+
+Program Level
+--------------------------------------------------------------------------------
+```{r, eval=FALSE}
+for(key in asm_map %>% filter(type == "Summative") %>% pull(plo)){
+  p <- map_draw_time(x = lx4, lo = key, ay = "AYn", dgr = "UND")
+  ggsave(paste0("fig/Program/ext_", key, ".png"), p,
+         height = 2, width = 3.5, units = "in")
+  # print(p)
+}
+```
+
+Core Level
+--------------------------------------------------------------------------------
+```{r, eval=FALSE}
+for(grp in levels(factor(asm_map$external_group))){
+  for(key in paste("BUS", 1:10)){
+    p <- map_draw_time(x = lx5ref, lo = key, stgrp = grp, ay = "AYn", dgr = "UND")
+    ggsave(paste0("fig/UND_Core/ext_", grp, "_", key, ".png"), p,
+           height = 2, width = 3.5, units = "in")
+    # print(p)
+  }
+}
+
+for(grp in c("Business Analytics", "Entrepreneurship", "General MBA", "Healthcare Management")){
+  for(key in paste("MBA", 1:8)){
+    p <- map_draw_time(x = lx5ref, lo = key, stgrp = grp, ay = "AYn", dgr = "MBA")
+    ggsave(paste0("fig/MBA_Core/ext_", grp, "_", key, ".png"), p,
+           height = 2, width = 3.5, units = "in")
+    # print(p)
+  }
+}
+
+```
+

@@ -1,0 +1,234 @@
+---
+title: "Note to Update Internal Indirect 01"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_notebook:
+    toc: yes
+    toc_float:
+      collapsed: yes
+    code_folding: hide
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+library(knitr)
+library(lubridate)
+datapath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+```
+
+Objective
+================================================================================
+Make internal indirect (exit survey) graphs for ACBSP presentation.
+Also, move the process from an existing project.
+
+- [ ] Add survey graphs to goals
+
+Data
+================================================================================
+First, load the data. Also, set some parameters for later use.
+```{r}
+path <- paste0(datapath, "Internal Indirect Assessment\\")
+fn1 <- "Full 2018-2020 MBA student survey.xlsx"
+fn2 <- "Full 2018-2020 UND student survey.xlsx"
+# Group survey questions for display
+idx <- list(Program = c(17, 18, 21, 22), Schedule = c(15, 27),
+            Advising = c(25, 28),
+            Courses = c(16, 20, 26), Student = c(19, 23, 24),
+            Outcome1 = 29:32, Outcome2 = 33:36)
+qidx <- sapply(idx, function(x) paste0("Q", x))
+
+# Import data
+df1 <- read_excel(paste0(path, fn1), "Raw Results")
+df2 <- read_excel(paste0(path, fn2), "Raw Results")
+# Merge data
+mdf <- bind_rows(df1, df2)
+```
+
+Then, create categories of interest (semesters) and order responses.
+```{r}
+responses <- c("Strongly Disagree", "Disagree", "Neutral",
+               "Agree", "Strongly Agree")
+ys <- c("2018 Fall", "2019 Spring", "2019 Summer", "2019 Fall", "2020 Spring")
+# Merge data and rename variables, while keeping questions in a vector
+questions <- names(mdf)
+questions <- paste0(rep("Q", length(questions)), 1:length(questions),
+                    " ", questions)
+names(mdf) <- paste0("Q", 1:ncol(mdf))
+
+# Add some new variables
+mdf <- mdf %>% mutate(
+  ID = 1:nrow(mdf), 
+  Time = mdy(Q1), Month = month(Time), Year = year(Time), 
+  Semester = case_when(Month < 6 ~ "Spring",
+                       Month > 5 & Month < 9 ~ "Summer",
+                       TRUE ~ "Fall"),
+  YS = paste(Year, Semester),
+  AY = case_when(
+    YS == "2018 Summer" | YS == "2018 Fall" | YS == "2019 Spring" ~ 2018,
+    YS == "2019 Summer" | YS == "2019 Fall" | YS == "2020 Spring" ~ 2019 ) )
+
+# Format variable types
+mdf <- mdf %>%
+  mutate_at(vars(Q15:Q36), ordered, responses) %>% 
+  mutate_at(vars(YS), ordered, ys) %>% 
+  mutate_at(vars(Month, Year, AY), ordered)
+
+```
+
+Graph
+================================================================================
+```{r}
+# Prepare for a long-format data of categorical answers
+lmdf <- mdf %>%
+  pivot_longer(cols = Q15:Q36, names_to = "QID", values_to = "Answer") %>% 
+  mutate(Question = factor(QID, levels = paste0("Q", 15:36),
+                           labels = questions[15:36]),
+         Agreed = ifelse(Answer == "Agree" | Answer == "Strongly Agree", 1, 0))
+
+mba <- lmdf %>% filter(!is.na(Answer) & Q2 == "MBA")
+und <- lmdf %>% filter(!is.na(Answer) & Q2 == "BS" & Semester != "Summer")
+```
+```{r}
+# Create frequency tables to reduce time for plotting
+tbl.mba.agreed <- mba %>% group_by(Question, QID, YS) %>%
+  summarise(Agreed = mean(Agreed), n = n())
+tbl.mba.answer <- mba %>% group_by(YS, Question, QID, Answer) %>%
+  summarise(n = n())
+tbl.und.agreed <- und %>% group_by(Question, QID, YS) %>%
+  summarise(Agreed = mean(Agreed), n = n())
+tbl.und.answer <- und %>% group_by(YS, Question, QID, Answer) %>%
+  summarise(n = n())
+```
+```{r}
+draw_graph <- function(x_answer, x_agreed, title = element_blank()){
+  # Wrapper function to draw graphs in a consistent format
+  caption <- "Grey number shows the sample size.\nRed horizontal line indicates the goal: at least 80% of students agree or strongly agree."
+  p <- ggplot() +
+    geom_col(data = x_answer, aes(YS, n, fill = Answer), position = "fill") +
+    scale_fill_brewer(palette = "RdYlBu", drop = FALSE)
+  p <- p +
+    geom_hline(yintercept = 0.8, color = "red", alpha = 0.8) +
+    geom_line(data = x_agreed, aes(YS, Agreed, group = Question)) +
+    geom_point(data = x_agreed, aes(YS, Agreed)) +
+    scale_colour_manual(values = setNames(c('black','red'),c(T, F))) + 
+    geom_text(data = x_agreed, aes(YS, -0.05, label = n), alpha = 0.7)
+  p <- p + facet_grid(cols = vars(str_wrap(Question, 25))) +
+    scale_y_continuous(labels = scales::percent) +
+    labs(title = title, caption = caption) +
+    theme(axis.title = element_blank(),
+          axis.text.x=element_text(angle=90,hjust=0.95,vjust=0.2),
+          text = element_text(family = "serif"),
+          panel.grid.major.x = element_blank(),
+          legend.position = "bottom",
+          plot.caption = element_text(hjust = 0))
+  p
+}
+```
+
+
+MBA
+```{r, eval=FALSE}
+for(i in 1:length(qidx)){
+  title <- paste("Pergrine Exit Survey, MBA,", names(qidx)[i], "Questions")
+  this <- qidx[[i]]
+  p <- draw_graph(tbl.mba.answer %>% filter(QID %in% this),
+                  tbl.mba.agreed %>% filter(QID %in% this), title)
+  print(p)
+  # ggsave(paste0("fig/", title, ".png"), p, width = 7, height = 7)
+}
+```
+
+```{r, eval=FALSE}
+for(i in 1:length(qidx)){
+  title <- paste("Pergrine Exit Survey, BS,", names(qidx)[i], "Questions")
+  this <- qidx[[i]]
+  p <- draw_graph(tbl.und.answer %>% filter(QID %in% this),
+                  tbl.und.agreed %>% filter(QID %in% this), title)
+  print(p)
+  # ggsave(paste0("fig/", title, ".png"), p, width = 7, height = 7)
+}
+```
+
+Previous results have been re-created.
+
+Individual Graph
+--------------------------------------------------------------------------------
+For ACBSP report, I need individual graphs and additional information.
+
+```{r}
+# Instead of facet, separate each graph
+
+tbl_und <- tbl.und.answer %>% 
+  left_join(tbl.und.agreed,
+            by = c("YS", "Question", "QID"),
+            suffix = c("_answer", "_total"))
+tbl_mba <- tbl.mba.answer %>% 
+  left_join(tbl.mba.agreed,
+            by = c("YS", "Question", "QID"),
+            suffix = c("_answer", "_total"))
+tbl_all <- bind_rows(tbl_und %>% mutate(Degree = "UND"),
+                     tbl_mba %>% mutate(Degree = "MBA")) %>% 
+  mutate(nYS = paste0(YS, "\n(n=", n_total, ")"),
+         lDegree = str_replace(Degree, "UND", "Undergraduate"))
+```
+
+
+```{r}
+draw_bl <- function(qid, deg){
+  x <- tbl_all %>% filter(QID == qid, Degree == deg)
+  ldeg <- x %>% pull(lDegree)
+  ttl <- paste("Survey Result,", ldeg, "Program,", qid)
+  subt <- x %>% pull(Question) %>% str_wrap(width = 60)
+  ncat <- nlevels(factor(x$YS))
+  
+  p <- ggplot(x) +
+    geom_col(aes(nYS, n_answer, fill = Answer), position = "fill") +
+    scale_fill_brewer(palette = "RdYlBu", drop = FALSE,
+                      labels = function(x) str_wrap(x, 8)) +
+    # annotate("text", x = 1, y = 0.85, label = "Benchmark: 80%",
+    #          color = "red", size = 3, alpha = 0.8) +
+    annotation_custom(grid::textGrob("80%",
+                                     gp = grid::gpar(col = "red",
+                                                     fontsize = 6,
+                                                     alpha = 0.6)), 
+        xmin=0.0, xmax=0.0, ymin=.8, ymax=.8) +
+    geom_hline(yintercept = 0.8, color = "red", alpha = 0.5) +
+    geom_line(aes(nYS, Agreed, group = Question)) +
+    geom_point(aes(nYS, Agreed)) +
+    scale_colour_manual(values = setNames(c('black','red'),c(T, F)))
+  p <- p +
+    scale_y_continuous(labels = scales::percent) +
+    labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    ggthemes::theme_fivethirtyeight(base_size = 7) +
+    theme(legend.position = "right",
+          legend.direction = "vertical",
+          plot.margin = unit(c(1,1,1,2), "lines")) +
+    coord_cartesian(xlim = c(0.8, ncat), clip="off")
+  p
+}
+
+# # Test
+# draw_bl("Q16", "UND")
+# p <- draw_bl("Q15", "UND")
+# ggsave(paste0("fig/test_survey.png"), p,
+#        height = 3.5, width = 4.5, units = "in")
+```
+
+Save graphics
+```{r, eval=FALSE}
+for(d in c("UND", "MBA")){
+  for(i in paste0("Q", 15:36)){
+    ggsave(paste0("fig/Survey/", d, i, ".png"), draw_bl(i, d),
+           height = 3.5, width = 4.5, units = "in")
+  }
+}
+```
+
