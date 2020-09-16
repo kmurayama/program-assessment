@@ -1,12 +1,7 @@
 ---
 title: "Note to Reflect Feedback after 1st Session 01"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+date: "9/4/2020"
 output:
-  html_document:
-    toc_float:
-      collapsed: yes
-    code_folding: hide
-    df_print: paged
   html_notebook:
     toc: yes
     toc_float:
@@ -15,7 +10,7 @@ output:
 ---
 
 ```{r setup, echo=FALSE, include=FALSE}
-knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+# knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
 library(tidyverse)
 options(dplyr.summarise.inform=FALSE) 
 library(readxl)
@@ -421,10 +416,10 @@ From Beth (Aug 14)
 Talked with Beth, having clarified several things.
 
 - [x] Add counts and US average to "overall" graph
-- [ ] Add total scores to external
-- [ ] Add break down of BUS assessments
+- [x] Add total scores to external
+- [x] Add break down of BUS assessments
 - [x] Come up with good names for breakdown measures for majors
-- [ ] Add survey graphs to goals
+- [x] Add survey graphs to goals
 
 First, let's unify the old and new graph procedures, by separating graph drawing and mapping.
 ```{r}

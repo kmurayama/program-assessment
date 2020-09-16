@@ -1,0 +1,321 @@
+---
+title: "ACBSP Standard 4 Write Up"
+output:
+  word_document:
+    reference_docx: template02.docx
+    toc: true
+    toc_depth: 2
+  html_document:
+    df_print: paged
+---
+
+```{r init, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+knitr::opts_chunk$set(fig.width = 3.5, fig.height = 2)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+rootpath <- "C:\\Users\\kentr\\California University of Pennsylvania"
+datapath <- paste0(rootpath, "\\ACBSP data reporting - Documents\\Data\\")
+```
+
+```{r function}
+draw_graph <- function(x, orientation, title, subtitle){
+  # Draw graph from the database
+  if(nrow(x) == 0){return(NULL)}
+  if(orientation == "Internal"){
+    ay <- "ay_internal_n"
+    outcome <- "internal_outcome"
+    target <- "internal_target"
+    n <- "internal_n"
+  } else if (orientation == "External"){
+    ay <- "ay_external_n"
+    outcome <- "external_outcome"
+    target <- "external_target"
+    n <- "external_n"
+  } else {
+    return(NULL)
+  }
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_line(aes(group = 1), na.rm = TRUE) +
+    geom_point(na.rm = TRUE) +
+    geom_hline(aes_string(yintercept = target),
+               alpha = 0.4, color = "red", na.rm = TRUE) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  p <- p +
+    labs(title = title, subtitle = subtitle) +
+    ylab("Outcome") + xlab("Academic Year\nSample Size")
+  p
+}
+draw_from_mapping <- function(plo_map){
+  i_plo <- plo_map %>% pull(plo)
+  i_type <- plo_map %>% pull(type)
+  int_tool <- plo_map %>% pull(internal_tool)
+  ext_tool <- plo_map %>% pull(external_tool)
+  
+  # Make titles
+  title <- paste(i_plo, i_type, collapse = " ")
+  int_title <- paste(title, "Internal", collapse = " ")
+  ext_title <- paste(title, "External", collapse = " ")
+  int_subtitle <- paste("Assessment Tool:", int_tool)
+  ext_subtitle <- paste("Assessment Tool:", ext_tool)
+  
+  # Draw subsample from the dataset
+  x <- outcomes %>% filter(plo == i_plo, type == i_type) 
+  # Check for empty cases, then make plot(s)
+  int_p <- NULL
+  ext_p <- NULL
+  if (nrow(x)!=0){
+    # Check for empty cases (PLO can have internal or external or both)
+    if(!is.na(int_tool)){
+      int_p <- draw_graph(x, "Internal", int_title, int_subtitle)
+      int_p <- int_p + ggthemes::theme_fivethirtyeight(base_size = 8)
+    }
+    if(!is.na(ext_tool)){
+      ext_p <- draw_graph(x, "External", ext_title, ext_subtitle)
+      ext_p <- ext_p + ggthemes::theme_fivethirtyeight(base_size = 8)
+    }
+    out <- list(x, int_p, ext_p)
+    names(out) <- c(title, int_subtitle, ext_subtitle)
+    return(out)
+  } else{
+    return(NULL)
+  }
+}
+```
+
+# Introduciton
+Here is a write up for ACBSP Standard 4.
+Key assessment outcomes are summarized with corresponding data. All the graphs are stored in Evidence/Graph directory, so please link to them once uploaded.
+
+The rest of this document is organized in the following way. First, MBA assessment outcomes are presented for the entire program.
+
+```{r data}
+# Import data from the database
+outcomes <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Outcome")
+mappings <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Mapping")
+# Add sample size to year index
+outcomes <- outcomes %>%
+  mutate(ay_internal_n = paste0(ay, '\nN = ', internal_n), 
+         ay_external_n = paste0(ay, '\nN = ', external_n))
+# Ultimately I want to reduce the process into just this. Database.
+# For that, though, I need to spend some time, re-organizing the database and
+# update the funciton accordingly
+# Move on for now
+```
+```{r}
+lx <- list()
+lp_int <- list()
+lp_ext <- list()
+for(i in 1:nrow(mappings)){
+  out <- draw_from_mapping(mappings[i, ])
+  if(!is.null(out)){
+    nm <- names(out[1])
+    lx[[nm]] <- out[[1]]
+    lp_int[[nm]] <- out[[2]]
+    lp_ext[[nm]] <- out[[3]]
+  }
+}
+```
+
+
+# MBA Assessment Outcomes
+We have updated our 8 core objectives for our MBA program.
+
+- LO1: Demonstrate ability to solve problems using the tools of accounting;
+- LO2: Demonstrate ability to solve problems using the tools of economics;
+- LO3: Demonstrate ability to solve problems using the tools of finance;
+- LO4: Demonstrate ability to solve problems using the tools of human resource management;
+- LO5: Demonstrate ability to solve problems using the tools of international business;
+- LO6: Demonstrate ability to solve problems using the tools of marketing;
+- LO7: Demonstrate ability to solve problems using the tools of strategic management; and
+- LO8: Employ mathematical and statistical techniques in business decision-making.
+
+Each of those objectives is assessed through up to 4 layers of assessment processes.
+Namely, 
+
+- Summative, direct assessments with external tools (CPC Exams);
+- Summative, direct assessments with internal tools (Comprehensive Exams);
+- Summative, indirect assessments with internal tools (Exit Survey); and
+- Formative, direct assessments with internal tools (Final Exams).
+
+In the following, first, I shall demonstrate the whole assessment process using one of the objectives.
+Then, several findings from assessments of other objectives are highlighted.
+Lastly, the overall trend is discussed briefly.
+
+## Case: MBA LO1
+
+### Summative Assessment
+In order to assess different levels of learning, we utilize both the external and internal assessment tools.
+As seen in the two graphs below, the external summative assessment is done through the score of Accounting category in the Peregrine CPC exam, while the internal summative assessment is done through the score of Accounting category in the comprehensive exam.
+The benchmark levels of student achievement are displayed in each graph by a red, horizontal line. The benchmark was established *a priori* as the U.S. average score (59 percentage score) for the Peregrine CPC exam and 80 percentage score for the comprehensive exam.
+
+In the recent years (academic year 2018 and 2019), the average scores of all the MBA students have deteriorated and failed to achieve the benchmark.
+However, the major reason for this can be found in the changes we made to our assessment rather than in the students.
+First, we adopted the external tool - Peregrine standardized test - to assess the knowledge of our students.
+The first year (academic year 2017) has a small sample, and thus the mean scores are sensitive to any score variations. Evidently, in the following years, the scores are close to the U.S. average.
+Second, we revised our internal assessment tools and implemented from the academic year 2019. The new measures are more strict and transparent than the previous ones, hence some apparent worsening of the scores were expected.
+Therefore, we believe the recent assessment outcomes are not an indication of exacerbated students' learning outcomes, but rather a more accurate assessments.
+We will continue monitoring the changes in the current academic year of 2020.
+
+![MBA 1](fig/MBA_Core/ext_All_MBA 1.png)
+
+
+```{r}
+lp_int[["MBA 1 Summative"]]
+```
+
+### Internal Indirect Assessment
+In addition to the direct assessments such as test and assignment scores, we collect subjective measures from the students through exit surveys.
+While we ask about students' experience in the program (e.g. adviser availability, curriculum needs, etc.), we ask about 8 questions about students' learning outcomes.
+Those questions are utilized to fill any gaps missed in the direct assessments.
+
+The graph below shows the 4 semester trend of the answers to one of such questions. The question asks our MBA students about their overall assessment of their ability to "integrate business concepts across the spectrum of business disciplines as a result of this program."
+Since each student has a unique need, self-assessments of the students on how well the program serves their goals provide us a critical information about the effectiveness of our program.
+
+According to the outcomes of this particular question, students have been fairly satisfied with their learning outcomes. Throughout the observation periods, the share of those who answered either "Strongly Agree" or "Agree" have been above 80%, our benchmark level.
+
+![Outcome 1](fig/Survey/MBAQ29.png)
+
+Another question relevant to the iLO 1 asks whether the student "acquired solid information technology skills" through the program.
+The answers to this question has been less than satisfactory, although there is a sign of improvement in the latest semester.
+During the department retreats during this summer, attending faculty has debated this issue intensively - and particularly so due to the ever increasing demand for technology fluency due to increasing remote works - and agreed to implement new strategies (such as collaboration with the school's technical supports, for instance).
+
+![Outcome 2](fig/Survey/MBAQ30.png)
+
+### Formative Assessment
+Moreover, formative assessments are carried out for all core objectives but LO 8 in the recent years. The common tools for such formative assessments are scores of final exams in selected courses. Like the internal summative assessments, we conducted an overhaul in formative assessment processes as well.
+Despite that, the formative assessment for LO1 indicates a satisfactory outcome in the latest measure, marking a recovery from the previous year.
+
+```{r}
+lp_int[["MBA 1 Formative"]]
+```
+
+### Demonstrative Case Conclusion
+Using one of the objectives, our assessment process is demonstrated in this section.
+In the following section, notable findings from the assessments of other objectives are highlighted.
+For a fuller assessment outcomes, please refer to the data sheet we provide separately from this report.
+
+## Findings in MBA Assessments
+etc. etc.
+
+## Overall Trend
+Lastly, I would like to present the overall assessment of students' learning as measured by the total grade (i.e. sum of all the topics/categories) of Peregrine CPC exams. 
+As shown in the graph below, the trend is downward in a non-trivial way, declining from 70 to 64 percentage scores; however, our students have performed above the benchmark (U.S. average score) throughout the observed years.
+
+![MBA](fig/MBA_Core/ext_all_final.png)
+
+# Undergraduate Program
+Our assessment process for the undergraduate program consists of the same structure as in the MBA assessment process:
+
+- Summative, direct assessments with external tools (CPC Exams);
+- Summative, direct assessments with internal tools (Comprehensive Exams);
+- Summative, indirect assessments with internal tools (Exit Survey); and
+- Formative, direct assessments with internal tools (Final Exams).
+
+One key difference is the large size of our undergraduate program.
+Our program has 7 programs/majors with multiple objectives for each, resulting in 24 objectives.
+Moreover, we assess all the students in the program against 10 core objectives.
+
+In the following, I describe the assessment processes at the program level and at the major level by using a demonstrative case.
+Then, like in the MBA section, some highlights from across the majors are presented.
+
+At the program level, we have 10 objectives as follows:
+
+- LO1: Demonstrate proficiency in all functional business areas;
+- LO2: Demonstrate appropriate information technology and information literacy skills;
+- LO3: Demonstrate appropriate quantitative skills;
+- LO4: Demonstrate appropriate qualitative skills;
+- LO5: Analyze complex business situations in order to make sound recommendations;
+- LO6: Communicate business findings and solutions through effective writing, oral presentations, and graphical illustrations;
+- LO7: Discern ethical choices and critically evaluate the ethical choices of others;
+- LO8: Evaluate socio-cultural and international diversity variables in decision making;
+- LO9: Work collaboratively with and provide feedback to others in a team setting; and
+- LO10: Reflect on personal leadership growth and potential
+
+assessed for all the business major students.
+Similar to the MBA assessment process, those objectives are measured through 4 layers of assessments.
+
+
+## Case: Core Objective 1
+The first objective, "Demonstrate proficiency in all functional business areas," measures the holistic ability for the students to apply the business knowledge.
+The external assessment is done with the average final score of the Peregrine CPC exams, while the internal assessment is done by looking at the distribution of the same scores.
+
+### Summative Assessments
+In the first graph (BUS 1 External Summative), average final scores are displayed for the entire business students (dotted line, white circle) and for the management major students (solid line, black circle) over the last 4 academic years. A strong upward trends are evident and both groups demonstrate scores higher than the benchmark level (U.S. average score; red line) in the recent years. The average scores among the management major students converged with the program-wide average in the recent years.
+
+![Core 1 Management](fig/UND_Core/ext_Management_BUS 1.png)
+
+In the second graph (BUS 1 Internal Summative), the shares of students who have passed the benchmark (U.S. average score) are displayed. Our target/benchmark achievement rate here is 70 percent of the students.
+Naturally, the trend follows the dynamics of the average scores, although the rapid increase in the higher rate of achievement indicate the improvements among the students at lower score tiers. This "catch-up" dynamics is an encouraging change over the past two years.
+
+![](fig/Archive/BUS 1 Internal Summative.png)
+
+However, These high-achieving outcomes are somewhat dubious. The average score for the academic year 2019 is about 70 percentage score, more than 15 percentage score higher than the U.S. average, or 27 percent higher than the U.S. average.
+During the assessment process, our assessment committee has interviewed instructors and their consensus is that such an exceptionally high achievement is unlikely given their interactions with the students.
+Hence, we regretfully concluded that some fraud is likely common among those students. This conclusion is further supported by the comparison with internal assessments that use more holistic approaches (e.g. term papers, simulations, etc.)
+
+During the analysis period and the department retreat, the whole department faculty have discussed actions to address this issue.
+We have concluded that a stricter monitoring procedure needs to be implemented to prevent students' cheating during exams.
+This is in line with the school's policy, and thus we are enforcing the use of monitoring of major exams in every online/remote classes in the current academic year (2020).
+Moreover, we debated ways to shift away from exams (or any forms of assessments that are easy to bypass), especially for online courses, such as project-based  and interactive assessments.
+
+### Internal Indirect Assessment
+In addition to the direct assessments, we collect subjective measures from the students through exit surveys. The graph below shows the trend of the answers to one of such questions.
+While the process is analogous to the one in MBA program, the number of data collection points is limited to 3 semesters. This is due to a very limited number of students completing the undergraduate program during the summer semester. We only had 1 student graduating in the Summer 2019.
+
+The question asks our students about their overall assessment of their ability to "integrate business concepts across the spectrum of business disciplines as a result of this program." As seen in the graph, the overall satisfaction level remains high in those semester, going over the benchmark level of 80 percents. Moreover, it is evident that the proportion of those who answered "Strongly Agree" has grown over time.
+
+![](fig/Survey/UNDQ29.png)
+
+## Case: Core Objective 2
+
+### Summative Assessments
+The second objective measures the students' ability to "Demonstrate appropriate information technology and information literacy skills."
+Again, the external assessment uses the average scores of Peregrine CPC exam score, but for the "Information Management Systems" category total.
+The internal assessment uses an Annotated Bibliography assignment from the program's capstone course. The assessment outcomes are derived by combining selected rows of the rubric, rather than a total or a single row. This allows us to implement a more holistic assessment of students' abilities.
+
+The external assessment outcomes indicate a strong upward trends both for the entire program and for the management major students. However, the concern of fraud prevents us from a straight-forward interpretation of such observations.
+
+In contrast, students have demonstrated steadily high achievement levels throughout the observations in the internal assessment.
+While the goal is to have 70 percents of students to meet the achievement goal (i.e. top 2 achievement levels out of 5), more than 90 percents of students have met the goal each year.
+
+![Core 2 Management](fig/UND_Core/ext_Management_BUS 2.png)
+
+![](fig/Archive/BUS 2 Internal Summative.png)
+
+### Internal Indirect Assessment
+Relevant survey questions for the second objective are Question 30 "I acquired solid information technology skills in my program" and Question 31 "My program encouraged me to find reliable sources of information on the internet as well as in the library."
+
+The outcomes to those questions are shown in the graphs below.
+In both measures, the students indicate high satisfactions above the benchmark level of 80 percents, except for Question 30 in the 2019 spring semester.
+At least to the students' eyes, their skills in the information technology and in information literacy are sufficiently trained through the program.
+
+Of course, this does not necessarily translate to the *actual* skill and literacy acquisition, relative to the needs from the potential employers.
+Our analysis in Standard 3, particularly those which are based on internship employer surveys and alumni career surveys, indicates that the majority of students have some room for improvement in critical thinking and analytic skills.
+Our comprehensive analysis using various sources led to another discussion during the department retreat, having merged the findings from other majors and the qualitative analysis from instructors.
+
+![](fig/Survey/UNDQ30.png)
+![](fig/Survey/UNDQ31.png)
+
+## Case: Management Major Objective 1
+The first objective, "apply managerial theories and concepts to solve organizational problems," is measured by Peregrine CPC Exam, Management category score (external assessment) and by Ethics Final Paper from a course.
+
+### Summative Assessment
+The external summative assessment is meant to measure the low-level mastery of the learning materials by the student. The trend as seen in the graph below shows a clear upward trend.
+
+![MGT 1 External](fig/Program/ext_MGT 1.png)
+
+In contrast, the internal summative assessment is meant to capture the higher-level of mastery such as integration and application of the knowledge by the students this major.
+The outcome measure of interest is the share of students who met the achievement goal (4 or better achievement level out of 5), while the benchmark is to have at least 70 percents of the students to reach the achievement goal.
+Students maintain a high level of outcomes throughout the observation period.
+
+![MGT 1 Internal](fig/Archive/MGT 1 Internal Summative.png)
+
+### Formative Assessment
+
+- program formative (MGT 300)
+
+## Findings in Undergraduate Program Assessments
+
+# Conclusion

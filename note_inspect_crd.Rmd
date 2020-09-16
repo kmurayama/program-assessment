@@ -1,0 +1,269 @@
+---
+title: "Note to Inspect Career Readiness Data (Intern Report)"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_notebook:
+    code_folding: hide
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: yes
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+library(knitr)
+datapath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+```
+
+Intro
+================================================================================
+
+Message from Meaghan Clister:
+ 
+> Attached are the Career Readiness Reports for Business students. Students are scored on a range of 1-7, with seven being the highest. 
+>  
+> Here is the breakdown of the scoring.
+>  
+> - The CRI ranges from 100 – 999
+> - The first 20% of the CRI reflects those with Basic Awareness.  The CRI range would be 100 – 803
+> - The second 20% of the CRI reflects those with Novice.  The CRI range would be 804 – 863
+> - The third 20% of the CRI reflects those with Intermediate.  The CRI range would be 864 – 918
+> - The fourth 20% of the CRI reflects those with Proficient.  The CRI range would be 919 – 970
+> - The fifth, and final 20% of the of the CRI reflects those with Accomplished.  The CRI range would be 971 – 999
+>  
+> I’ve also included the score that students have rated themselves and each category that students are evaluated. The Career Readiness categories are based on the eight NACE competencies. NACE is the National Association of Colleges and Employers https://www.naceweb.org/ and is the professional association for Career and Internship professionals.
+ 
+ 
+NACE?
+
+https://www.naceweb.org/career-readiness/competencies/career-readiness-defined/
+
+> Definition of Career Readiness and Competencies
+> 
+> Career readiness is the attainment and demonstration of requisite competencies that broadly prepare college graduates for a successful transition into the workplace.
+> 
+> These competencies are:
+>
+>     Critical Thinking/Problem Solving: Exercise sound reasoning to analyze issues, make decisions, and overcome problems. The individual is able to obtain, interpret, and use knowledge, facts, and data in this process, and may demonstrate originality and inventiveness.
+>     Oral/Written Communications: Articulate thoughts and ideas clearly and effectively in written and oral forms to persons inside and outside of the organization. The individual has public speaking skills; is able to express ideas to others; and can write/edit memos, letters, and complex technical reports clearly and effectively.
+>     Teamwork/Collaboration: Build collaborative relationships with colleagues and customers representing diverse cultures, races, ages, genders, religions, lifestyles, and viewpoints. The individual is able to work within a team structure, and can negotiate and manage conflict.
+>     Digital Technology: Leverage existing digital technologies ethically and efficiently to solve problems, complete tasks, and accomplish goals. The individual demonstrates effective adaptability to new and emerging technologies.
+>     Leadership: Leverage the strengths of others to achieve common goals, and use interpersonal skills to coach and develop others. The individual is able to assess and manage his/her emotions and those of others; use empathetic skills to guide and motivate; and organize, prioritize, and delegate work.
+>     Professionalism/Work Ethic: Demonstrate personal accountability and effective work habits, e.g., punctuality, working productively with others, and time workload management, and understand the impact of non-verbal communication on professional work image. The individual demonstrates integrity and ethical behavior, acts responsibly with the interests of the larger community in mind, and is able to learn from his/her mistakes.
+>     Career Management: Identify and articulate one's skills, strengths, knowledge, and experiences relevant to the position desired and career goals, and identify areas necessary for professional growth. The individual is able to navigate and explore job options, understands and can take the steps necessary to pursue opportunities, and understands how to self-advocate for opportunities in the workplace.
+>     Global/Intercultural Fluency: Value, respect, and learn from diverse cultures, races, ages, genders, sexual orientations, and religions. The individual demonstrates, openness, inclusiveness, sensitivity, and the ability to interact respectfully with all people and understand individuals’ differences.
+
+
+
+Data
+================================================================================
+```{r}
+path <- paste0(datapath, "Career Readiness Reports\\")
+fn <- "Career Readiness Reports.xlsx"
+
+crd <- read_excel(paste0(path, fn), "Main")
+names(crd) <- c("Name", "Course", "Report", "Overall", "Self", "Semester",
+                "Professionalism", "Communication", "Technology", "Teamwork",
+                "Critical Thinking", "Career Management", "Leadership",
+                "Intercultural Fluency", "Remote Work",
+                "Positive Comment", "Area of Improvement")
+crd <- crd %>%
+  mutate(Semester =
+           ordered(Semester,
+                   levels = c("Summer 2019", "Fall 2019", "Spring 2020")),
+         Report = 
+           ordered(Report,
+                   levels = c("Emerging", "Effective", "Proficient",
+                              "Accomplished", "Advanced")),
+         Met = (Report %in% c("Proficient", "Accomplished", "Advanced"))
+         )
+lcrd <- crd %>%
+  pivot_longer(cols = c(Overall:Self, Professionalism:`Remote Work`), 
+               names_to = "Measure", values_to = "Score")
+```
+
+Inspect
+================================================================================
+Report and Overall are not exactly matching. Is this what they explained in the email? They are differene measures?
+```{r}
+ggplot(crd, aes(Semester, Overall)) + geom_jitter(aes(color = Report))
+```
+
+Self-assessment and Overall score has no correlation.
+```{r}
+ggplot(crd, aes(Overall, Self)) + geom_point() +
+  coord_fixed(ratio = 1, xlim = c(5.5, 7), ylim = c(5.5, 7))
+# Excluded some outliers...
+```
+
+
+There are significant outliers relative to the sample size, distorting the averages often. Median is a better measure for the center.
+```{r}
+ggplot(lcrd, aes(Semester, Score)) + geom_boxplot() + facet_wrap(vars(Measure))
+p <- ggplot(lcrd, aes(Semester, Score, group = 1)) +
+  stat_summary(fun = median, geom = "line") +
+  stat_summary(fun = mean, geom = "line", color = "red")
+
+p + facet_wrap(vars(Measure))
+
+```
+
+```{r}
+crd %>% group_by(Semester) %>%
+  summarize(Mean = mean(Overall, na.rm = TRUE),
+            Median = median(Overall, na.rm = TRUE),
+            Diff = (Mean - Median)/Median
+            )
+```
+
+Set the benchmark to 6.5 out of 7. It highlights the weakness.
+```{r}
+benchmark <- 6.5
+lcrd <- lcrd %>% mutate(Delta = Score - benchmark)
+tbl_med <- lcrd %>% group_by(Measure) %>%
+  summarise(
+    Score = median(Score, na.rm = TRUE),
+    Delta = median(Delta, na.rm = TRUE)) %>% 
+  mutate(highlight = (Measure == "Overall"))
+tbl_med
+```
+
+
+```{r}
+ttl <- "Employers' Assessment of Interns"
+subttl <- "Differences between median and the benchmark (6.5 out of 7)"
+cap <- "Note: Data are aggregation over the academic year 2019."
+p <- ggplot(tbl_med %>% filter(Measure != "Self"),
+            aes(reorder(Measure, Delta), Delta)) +
+  geom_bar(aes(fill = highlight), stat = "identity") +
+  scale_fill_manual(values = c("grey50", "blue"))
+p1 <- p + coord_flip(ylim = c(-0.2, 0.5)) +
+  labs(title = ttl, subtitle = subttl, caption = cap) +
+  ggthemes::theme_fivethirtyeight(base_size = 6) +
+  theme(legend.position = "none")
+p1
+```
+
+CalU students seem to be good with interpersonal skills (Teamwork and Intercultural Fluency) and work independently (Career Management and Remote Work).
+In contrast, the areas of improvement are Leadership and Critical Thinking by a large margins.
+
+
+```{r, fig.height=7, fig.width=6}
+tbl_med_sem <- lcrd %>% group_by(Measure, Semester) %>%
+  summarise(Score = median(Score, na.rm = TRUE)) %>% 
+  mutate(highlight = (Measure == "Overall"),
+         lSemester = case_when(Semester == "Summer 2019" ~ "SU\n2019",
+                               Semester == "Fall 2019" ~ "FA\n2019",
+                               Semester == "Spring 2020" ~ "SP\n2020"))
+
+ttl <- "Employers' Assessment of Interns"
+subttl <- "Median scores. Highlighted are below the benchmark (6.5 out of 7)"
+cap <- "Note: Original scale ranges 1-7."
+p <- ggplot(tbl_med_sem %>% filter(Measure != "Self"),
+            aes(lSemester, Score, group = Measure)) +
+  geom_line() +
+  geom_point(aes(color = Score < benchmark)) +
+  scale_color_manual(values = c("black", "red"))
+p2 <- p + facet_wrap(vars(Measure)) +
+  labs(title = ttl, subtitle = subttl, caption = cap) +
+  ggthemes::theme_fivethirtyeight() +
+  theme(legend.position = "none")
+p2
+```
+
+According to the presentation on SkillSurvey (Evidence/Standard3/CalUPA_AggregateData_9-20-19.pptx), employers consider the following skills most important:
+
+- Critical thinking
+- Professionalism
+- Teamwork
+- Communication.
+```{r}
+ttl <- "Employers' Assessment of Interns (Selected)"
+subttl <- "Median scores. Highlighted are below the benchmark (6.5 out of 7)"
+cap <- "Note: Original scale ranges 1-7."
+skills <- c("Critical Thinking", "Professionalism", "Teamwork", "Communication")
+
+p <- ggplot(tbl_med_sem %>% filter(Measure %in% skills),
+            aes(lSemester, Score, group = Measure)) +
+  geom_line() +
+  geom_point(aes(color = Score < benchmark)) +
+  scale_color_manual(values = c("black", "red"))
+p3 <- p + facet_wrap(vars(Measure)) +
+  labs(title = ttl, subtitle = subttl, caption = cap) +
+  ggthemes::theme_fivethirtyeight(base_size = 6) +
+  theme(legend.position = "none")
+p3
+
+```
+
+
+
+```{r, eval=FALSE}
+dir.create("fig")
+dir.create("fig/Intern")
+ggsave(paste0("fig/Intern/intern_overall_delta.png"), p1,
+       height = 2, width = 3.5, units = "in")
+ggsave(paste0("fig/Intern/intern_skills_time.png"), p3,
+       height = 3, width = 3.5, units = "in")
+
+```
+
+
+Beth has some comment on Report rating.
+```{r}
+x1 <- crd %>% group_by(Semester, Report) %>% summarise(n_prof = n())
+x2 <- crd %>% group_by(Semester) %>%
+  summarise(n = n(),
+            Met = mean(Met)) %>% 
+  mutate(lSemester = case_when(Semester == "Summer 2019" ~ "SU\n2019",
+                               Semester == "Fall 2019" ~ "FA\n2019",
+                               Semester == "Spring 2020" ~ "SP\n2020"),
+         oSemester = case_when(Semester == "Summer 2019" ~ 1,
+                               Semester == "Fall 2019" ~ 2,
+                               Semester == "Spring 2020" ~ 3),
+         lnSemester = paste(lSemester, "\n(n=", n, ")")
+         )
+tbl_prof <- x1 %>% left_join(x2, by = c("Semester"))
+tbl_prof
+```
+
+
+```{r}
+ttl <- "Interns' Report Assessments"
+subttl <- ""
+p <- ggplot(tbl_prof, aes(fct_reorder(lnSemester, oSemester), n_prof)) +
+  geom_col(aes(fill = Report), position = "fill") +
+    scale_fill_brewer(palette = "RdYlBu", drop = FALSE) +
+  geom_point(aes(y = Met)) +
+  geom_line(aes(y = Met, group = 1)) +
+  annotation_custom(grid::textGrob("90%",
+                                   gp = grid::gpar(col = "red",
+                                                   fontsize = 6,
+                                                   alpha = 0.6)), 
+      xmin=0.0, xmax=0.0, ymin=.9, ymax=.9) +
+  geom_hline(yintercept = 0.9, color = "red", alpha = 0.5)
+p4 <- p +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = ttl, subtitle = subttl) +
+  xlab("Academic Year\nSample Size") +
+  ggthemes::theme_fivethirtyeight(base_size = 6) +
+  theme(legend.position = "right",
+        legend.direction = "vertical",
+        plot.margin = unit(c(1,1,1,2), "lines")) +
+  coord_cartesian(xlim = c(0.8, 3), clip="off")
+p4
+```
+
+```{r}
+ggsave(paste0("fig/Intern/intern_prof_time.png"), p4,
+       height = 2.5, width = 3.5, units = "in")
+
+```
+

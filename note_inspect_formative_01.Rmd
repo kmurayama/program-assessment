@@ -1,0 +1,25 @@
+---
+title: "Note to Inspect Formative Assessment Data 01"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_notebook:
+    code_folding: hide
+---
+
+```{r init, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+knitr::opts_chunk$set(fig.width = 3.5, fig.height = 2)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+rootpath <- "C:\\Users\\kentr\\California University of Pennsylvania"
+datapath <- paste0(rootpath, "\\ACBSP data reporting - Documents\\Data\\")
+```
+
+# Objective
+Need some formative assessment for the report. Pick a course (MGT 300) and get some information out. Codes in `internal_direct` project are somewhat outdated, but the essential parts are moved into this project.
+
+# Data
+
+# Visualize
+

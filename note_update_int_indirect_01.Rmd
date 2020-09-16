@@ -1,19 +1,14 @@
 ---
 title: "Note to Update Internal Indirect 01"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+date: "9/3/2020"
 output:
-  html_notebook:
-    toc: yes
-    toc_float:
-      collapsed: yes
-    code_folding: hide
   html_document:
     toc: yes
     df_print: paged
 ---
 
 ```{r setup, echo=FALSE, include=FALSE}
-knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+# knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
 library(tidyverse)
 options(dplyr.summarise.inform=FALSE) 
 library(readxl)
@@ -28,7 +23,7 @@ Objective
 Make internal indirect (exit survey) graphs for ACBSP presentation.
 Also, move the process from an existing project.
 
-- [ ] Add survey graphs to goals
+- [x] Add survey graphs to goals
 
 Data
 ================================================================================
@@ -69,17 +64,21 @@ mdf <- mdf %>% mutate(
   Semester = case_when(Month < 6 ~ "Spring",
                        Month > 5 & Month < 9 ~ "Summer",
                        TRUE ~ "Fall"),
+  nSemester = case_when(Semester == "Spring" ~ 1,
+                        Semester == "Fall" ~ 3,
+                        Semester == "Summer" ~ 2),
   YS = paste(Year, Semester),
   AY = case_when(
     YS == "2018 Summer" | YS == "2018 Fall" | YS == "2019 Spring" ~ 2018,
-    YS == "2019 Summer" | YS == "2019 Fall" | YS == "2020 Spring" ~ 2019 ) )
+    YS == "2019 Summer" | YS == "2019 Fall" | YS == "2020 Spring" ~ 2019 ),
+  nYS = Year * 10 + nSemester
+  )
 
 # Format variable types
 mdf <- mdf %>%
   mutate_at(vars(Q15:Q36), ordered, responses) %>% 
   mutate_at(vars(YS), ordered, ys) %>% 
   mutate_at(vars(Month, Year, AY), ordered)
-
 ```
 
 Graph
@@ -97,13 +96,13 @@ und <- lmdf %>% filter(!is.na(Answer) & Q2 == "BS" & Semester != "Summer")
 ```
 ```{r}
 # Create frequency tables to reduce time for plotting
-tbl.mba.agreed <- mba %>% group_by(Question, QID, YS) %>%
+tbl.mba.agreed <- mba %>% group_by(Question, QID, nYS, YS) %>%
   summarise(Agreed = mean(Agreed), n = n())
-tbl.mba.answer <- mba %>% group_by(YS, Question, QID, Answer) %>%
+tbl.mba.answer <- mba %>% group_by(nYS, YS, Question, QID, Answer) %>%
   summarise(n = n())
-tbl.und.agreed <- und %>% group_by(Question, QID, YS) %>%
+tbl.und.agreed <- und %>% group_by(Question, QID, nYS, YS) %>%
   summarise(Agreed = mean(Agreed), n = n())
-tbl.und.answer <- und %>% group_by(YS, Question, QID, Answer) %>%
+tbl.und.answer <- und %>% group_by(nYS, YS, Question, QID, Answer) %>%
   summarise(n = n())
 ```
 ```{r}
@@ -167,15 +166,15 @@ For ACBSP report, I need individual graphs and additional information.
 
 tbl_und <- tbl.und.answer %>% 
   left_join(tbl.und.agreed,
-            by = c("YS", "Question", "QID"),
+            by = c("YS", "nYS", "Question", "QID"),
             suffix = c("_answer", "_total"))
 tbl_mba <- tbl.mba.answer %>% 
   left_join(tbl.mba.agreed,
-            by = c("YS", "Question", "QID"),
+            by = c("YS", "nYS", "Question", "QID"),
             suffix = c("_answer", "_total"))
 tbl_all <- bind_rows(tbl_und %>% mutate(Degree = "UND"),
                      tbl_mba %>% mutate(Degree = "MBA")) %>% 
-  mutate(nYS = paste0(YS, "\n(n=", n_total, ")"),
+  mutate(lnYS = paste0(YS, "\n(n=", n_total, ")"),
          lDegree = str_replace(Degree, "UND", "Undergraduate"))
 ```
 
@@ -189,7 +188,7 @@ draw_bl <- function(qid, deg){
   ncat <- nlevels(factor(x$YS))
   
   p <- ggplot(x) +
-    geom_col(aes(nYS, n_answer, fill = Answer), position = "fill") +
+    geom_col(aes(fct_reorder(lnYS, nYS), n_answer, fill = Answer), position = "fill") +
     scale_fill_brewer(palette = "RdYlBu", drop = FALSE,
                       labels = function(x) str_wrap(x, 8)) +
     # annotate("text", x = 1, y = 0.85, label = "Benchmark: 80%",
@@ -200,8 +199,8 @@ draw_bl <- function(qid, deg){
                                                      alpha = 0.6)), 
         xmin=0.0, xmax=0.0, ymin=.8, ymax=.8) +
     geom_hline(yintercept = 0.8, color = "red", alpha = 0.5) +
-    geom_line(aes(nYS, Agreed, group = Question)) +
-    geom_point(aes(nYS, Agreed)) +
+    geom_line(aes(lnYS, Agreed, group = Question)) +
+    geom_point(aes(lnYS, Agreed)) +
     scale_colour_manual(values = setNames(c('black','red'),c(T, F)))
   p <- p +
     scale_y_continuous(labels = scales::percent) +
@@ -224,6 +223,8 @@ draw_bl <- function(qid, deg){
 
 Save graphics
 ```{r, eval=FALSE}
+dir.create("fig")
+dir.create("fig/Survey")
 for(d in c("UND", "MBA")){
   for(i in paste0("Q", 15:36)){
     ggsave(paste0("fig/Survey/", d, i, ".png"), draw_bl(i, d),
@@ -232,3 +233,6 @@ for(d in c("UND", "MBA")){
 }
 ```
 
+Conclusion
+================================================================================
+Not informative as a note, since graphs are exported for ACBSP reporting.

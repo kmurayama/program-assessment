@@ -1,9 +1,7 @@
 ---
 title: "Note to Update External Direct 02"
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+date: "9/4/2020"
 output:
-  html_notebook:
-    code_folding: hide
   html_document:
     toc: yes
     toc_float:
@@ -13,7 +11,7 @@ output:
 ---
 
 ```{r setup, echo=FALSE, include=FALSE}
-knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+# knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
 library(tidyverse)
 options(dplyr.summarise.inform=FALSE) 
 library(readxl)
@@ -28,8 +26,8 @@ Objective
 Make external direct (Peregrine CPC) graphs for ACBSP presentation.
 Also, move the process from an existing project.
 
-- [ ] Add total scores to external
-- [ ] Add break down of BUS assessments
+- [x] Add total scores to external
+- [x] Add break down of BUS assessments
 
 Data
 ================================================================================
@@ -101,6 +99,7 @@ lmdf <- lmdf %>%
 lmdf <- lmdf %>%
   mutate(Major = str_replace(Major,"Interdisciplinary Studies in Business and Commerce", "General Business"),
          Degree = str_replace(Degree, "BS", "UND"))
+
 ```
 
 Aggregate by different level (all business major, by major, by specialization).
@@ -190,6 +189,7 @@ ctrl <- x5 %>% filter(Major == "All") %>% select(-US) %>%
          mean_ctrl = mean, n_ctrl = n, met_ctrl = met, met_diff_ctrl = mean_diff)
 x5ref <- x5 %>% select(-mean_diff) %>% 
   left_join(ctrl, by = c("Degree", "AY", "Course"))
+
 ```
 
 Export Output Table
@@ -224,7 +224,9 @@ lx5ref <- x5ref %>%
 draw_time <- function(x, outcome,
                       ay="AY", grp = "Type", tgt="US",
                       ttl="Title", subt="Sub"){
-  # Draw time plot. 
+  # Draw time plot.
+  # Using the output table, varialbes needed for this functions are col names
+  # Selection of data is done outside of this function
   p <- ggplot(x, aes_string(ay, outcome)) +
     geom_hline(aes_string(yintercept = tgt),
                alpha = 0.4, color = "red", na.rm = TRUE) +
@@ -257,12 +259,19 @@ subt <- paste0("Assessment Tool: ", tool, "\nFocus Group: ", stgrp)
 # Select for plot
 x <- lx5ref %>% filter(Degree == "UND", Major == stgrp,
                       Course == "Final Score")
-
+table(x$Type)
 draw_time(x, "mean", ay = "AYn", ttl = ttl, subt = subt)
-draw_time(x, "mean", ay = "AYn", ttl = ttl, subt = subt) + scale_y_continuous(limits = c(0.5, 1))
 
 # Test 2 (Graph for lx4 or program level assessment still works)
 draw_time(lx4 %>% filter(PLO == "ACC 1"), "mean", ay = "AYn", grp = "Type")
+
+# Test 3 (Focus and target are the same: Overall result)
+x <- lx5ref %>% filter(Degree == "MBA", Specialization == "All",
+                      Course == "Final Score")
+x # Values (mean) are the same for both Type (mean, mean_ctrl)
+# Need to just have one of them. Also, ggplot needs to skip grouping.
+draw_time(x, "mean", ay = "AYn", ttl = ttl, subt = subt)
+
 ```
 
 ```{r}
@@ -326,6 +335,10 @@ for(key in asm_map %>% filter(type == "Summative") %>% pull(plo)){
 Core Level
 --------------------------------------------------------------------------------
 ```{r, eval=FALSE}
+dir.create("fig")
+dir.create("fig/UND_Core")
+dir.create("fig/MBA_Core")
+
 for(grp in levels(factor(asm_map$external_group))){
   for(key in paste("BUS", 1:10)){
     p <- map_draw_time(x = lx5ref, lo = key, stgrp = grp, ay = "AYn", dgr = "UND")
@@ -335,7 +348,7 @@ for(grp in levels(factor(asm_map$external_group))){
   }
 }
 
-for(grp in c("Business Analytics", "Entrepreneurship", "General MBA", "Healthcare Management")){
+for(grp in c("Business Analytics", "Entrepreneurship", "General MBA", "Healthcare Management", "All")){
   for(key in paste("MBA", 1:8)){
     p <- map_draw_time(x = lx5ref, lo = key, stgrp = grp, ay = "AYn", dgr = "MBA")
     ggsave(paste0("fig/MBA_Core/ext_", grp, "_", key, ".png"), p,
@@ -345,4 +358,19 @@ for(grp in c("Business Analytics", "Entrepreneurship", "General MBA", "Healthcar
 }
 
 ```
+
+Overall scores for MBA Peregrine is not in the mapping list.
+```{r}
+ttl <- "MBA Overall External Summative"
+subt <- "Assessment Tool: CPC Exam - Final Score"
+
+x0 <- x %>% filter(Degree == "MBA", Course == "Final Score", Specialization == "All")
+p0 <- draw_time(x0, "mean", ay = "AYn", ttl = ttl, subt = subt)
+ggsave("fig/MBA_Core/ext_all_final.png", p0,
+       height = 2, width = 3.5, units = "in")
+```
+
+Conclusion
+================================================================================
+Not informative as a note, since graphs are exported for ACBSP reporting. There are just too many graphs for a note/report. It needs some focus.
 

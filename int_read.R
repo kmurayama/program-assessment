@@ -1,5 +1,11 @@
+library(tidyverse)
+library(readxl)
 ## ---- import-d2l ----
-path <- "C:\\Users\\kentr\\OneDrive - California University of Pennsylvania\\Data\\Internal Direct Assessment\\"
+rootpath <- "C:\\Users\\kentr\\California University of Pennsylvania"
+datapath <- paste0(rootpath, "\\ACBSP data reporting - Documents\\Data\\")
+
+path <- paste0(datapath, "Internal Direct Assessment\\")
+
 fn <- "Rubrics.xlsx"
 df <- read_xlsx(paste0(path, fn)) %>%
   mutate(across(c(RubricId:Name, LevelAchieved), factor),
