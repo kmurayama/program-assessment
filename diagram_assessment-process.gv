@@ -1,0 +1,47 @@
+digraph {
+  graph[color = crimson, nodesep = .5, ranksep = .25, fontname = Arial]
+  
+  subgraph cluster0 {
+    label = "Internal Assessment"
+    node [shape = box, fixedsize = true, width= 2.5]
+    del1 [label = "Rubric"]
+    del2 [label = "D2L Rubric"]
+    del3 [label = "Outcome Data"]
+    del4 [label = "Exported Data"]
+    
+    node [shape = diamond, fixedsize = true, width= 2.5]
+    act1 [label = "Adopt"]
+    act2 [label = "Grade"]
+    act3 [label = "Collect"]
+  }
+  
+  subgraph cluster1 {
+    label = "Data Analysis"
+    node [shape = box, fontname = Helvetica, width= 2.5, fontsize = 12]
+    del5 [label = "Summary"]
+    
+    node [shape = diamond, fontname = Helvetica, width= 2.5, fontsize = 12]
+    act4 [label = "Clean"]
+    act5 [label = "Analyze"]
+  }
+  
+  
+  subgraph cluster2 {
+    label = "Communication and Review"
+    node [shape = diamond, fontname = Helvetica, width= 2.5, fontsize = 12]
+    act6 [label = "Share"]
+    act7 [label = "Reflect"]
+  }
+  
+  
+  node [shape = box, fontname = Helvetica, width= 2.5, fontsize = 12]
+  del6 [label = "External Scores"]
+  del7 [label = "Survey Results"]
+  
+  
+  del1 -> act1 -> del2 -> act2 -> del3 -> act3 -> del4 -> act4 -> act5 -> del5
+  del6 -> act4
+  del7 -> act4
+  del5 -> act6 -> act7 -> del1
+  
+}

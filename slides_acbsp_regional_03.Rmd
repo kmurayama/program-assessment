@@ -1,0 +1,144 @@
+---
+title: "Developing Leadership Skills through Assessment"
+subtitle: "ACBSP Region 2 Conference"
+author:
+  - Edmund Matecki^[Associate Professor of Economic, California University]
+  - Kentaro Murayama^[Visiting Assisstant Professor of Economics, California University]
+date: "November 5-6, 2020"
+output:
+  powerpoint_presentation:
+      reference_doc: my-style01.pptx
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+```
+
+# Motivation: Why do we care about leadership?
+
+- Survey
+- Initial assessment
+
+# The Change
+
+```{r}
+df <- data.frame(name = c(rep("Old", 2) , rep("New", 2)),
+                 type = rep(c("Leadership", "Else"), 2),
+                 value = c(23, 77, 40, 60)/100
+                 )
+ggplot(df) +
+  geom_col(aes(x = factor(name, levels=c("Old", "New")), y = value,
+               fill = factor(type, levels=c("Else", "Leadership"))),
+           position = "stack") +
+  scale_fill_manual(values = c("grey", "red")) +
+  ggtitle("Leadership Objectives, Now and Then (%)") +
+  scale_y_continuous(labels = scales::percent) +
+  xlab("") + ylab("") +
+  theme_minimal() +
+  theme(legend.position = "None", aspect.ratio = 1)
+```
+
+
+# Curriculum Improvements
+
+
+# Multi-pronged Assessment Regime
+
+Diagram
+
+# Automation of Data Collection & Analysis
+
+Diagram
+
+# Assessing Leadership: Business Core
+
+- LO7: Discern ethical choices and critically evaluate the ethical choices of others.
+- LO8: Evaluate socio-cultural and international diversity variables in decision making.
+- LO9: Work collaboratively with and provide feedback to others in a team setting.
+- LO10: Reflect on personal leadership growth and potential.
+  
+  
+# Demonstration: Business Core LO 8
+
+1. Re-define Learning Objectives
+2. Re-design Assessment Tools
+3. Implement Standardized Assessment Mechanisms
+4. Automate Data Collection and Processing
+5. Communicate Feedback
+
+# 1. Re-define Learning Objectives
+
+Learning Objective: Evaluate socio-cultural and international diversity variables in decision making.
+
+
+# 2. Re-design Assessment Tools
+
+- External Tool: Peregrine CPC Exam
+- Internal Tool: Project Assignment "Ethics Case"
+
+
+# 3. Implement Standardized Assessment Mechanisms
+
+(Sereis of Screenshots)
+
+# 4. Automate Data Collection and Processing
+
+## Challenges
+
+- Inconsistency in rubrics (e.g. word choices, typos, etc.)
+- Variations in the data sources (e.g. external/internal, rubric/exam, etc.)
+- Timely responses for feedback
+
+## Solutions
+
+- Literal programming for reproducible analysis
+- Iterative data processing
+
+
+# 5. Communicate Feedback
+
+- Annual Department Retreat
+  - Assessment outcomes for core objectives
+  - Assessment outcomes for each program
+  - Strategy development
+- 
+
+## Complementary Design in Action
+
+Challenge: Internal and external assessment outcomes are not directly comparable
+
+- Track the changes over time
+- Two-dimensional dynamics
+- Possible calibration
+
+
+# Single Measures
+
+Graphs
+
+
+# Combined Measures
+
+Graph
+
+
+
+# Feedback & Strategy Development
+
+## Annual Meeting & Strategy Development
+
+- Data analysis provided
+- Discuss the findings with additional qualitative information from discutants
+- Review the existing assessment tools in light of learning objectives
+- Propose changes in assessment tools (and/or learning objectives)
+
+
+## Continuous Feedback
+
+- Assessment Committee
+- Curriculum Development Committee
+- Individual faculty members (both regular and temporary)
+
+

@@ -7,6 +7,8 @@ data/*
 *docx
 !template*.docx
 *html
+*pptx
+!my-style*.pptx
 
 fig/*
 out/*

@@ -1,0 +1,14 @@
+digraph {
+  graph[layout = dot, rankdir = LR]
+  
+  node [shape = box, fontname = Helvetica, width= 2.5, fontsize = 12]
+  a [label = "Course-embedded\n Formative Assessments"]
+  b1 [label = "Course-embedded\n Summative assessments"]
+  b2 [label = "Peregrine Exit Exam\n Aligned CPC Topic"]
+  b3 [label = "Student Exit Survey\n Aligned Question"]
+  b4 [label = "External Stakeholder Survey\n Aligned Question"]
+  c [label = "Learning Objectives"]
+  
+  a -> {b1 b2 b3 b4} [dir=both]
+  {b1 b2 b3 b4} -> c
+}

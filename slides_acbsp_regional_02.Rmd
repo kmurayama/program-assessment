@@ -1,0 +1,149 @@
+---
+title: "Developing Leadership Skills through Assessment"
+subtitle: "ACBSP Region 2 Conference"
+author:
+  - Edmund Matecki^[Associate Professor of Economic, California University]
+  - Kentaro Murayama^[Visiting Assisstant Professor of Economics, California University]
+date: "November 5-6, 2020"
+output:
+  powerpoint_presentation:
+      reference_doc: my-style01.pptx
+---
+
+# Presentation Roadmap
+
+1. Humble beginnings: Business Assessment 5 Years Ago
+2. Where we are now: An Assessment Revolution
+3. Application: Developing Leadership Through Assessment
+
+## Learning Objectives
+
+
+# An Assessment Story: Humble Beginnings
+
+
+# An Assessment Story: Evolution
+
+Over the course of several years we evolved….
+
+- Started taking the pursuit of ACBSP accreditation seriously!
+- Added Peregrine Academics as a vendor
+- Expanded and reworded LO’s
+- Utilized shared drive with fillable documents
+- Started holding an assessment and strategic planning retreat in August before the start of the school year
+- We were working harder, but still did not feel that we were close to assessment nirvana.  
+
+
+# An Assessment Story: Revolution
+
+Complete Process Redesign
+
+1. Undergraduate curriculum improvements
+2. Graduate curriculum reimagined
+3. Multi-pronged assessment regime
+4. Automation of the Data Collection Process
+5. Sophisticated Data Analysis
+
+
+## 1. Undergrad Curriculum Improvements
+
+- Reformulated Strategic Management Course into a Strategic Capstone
+  - Rubric-graded simulations, case studies, and project-based assessments
+  - Houses all summative assessments for the common core LO’s
+  - Incorporated Peregrine Exit Exam for a grade in the course
+  - Incorporated the Student Exit Survey into the Peregrine Exam
+- Added formative assessments to all business core classes
+  - Developed rubric-graded “Signature Assignments”
+  - Aligned with ACBSP core competencies
+
+
+## 2. Grad Curriculum Redesign: A new way to MBA
+
+- Developed five new core MBA classes built on three learning goals
+  - Integrate concepts across business disciplines
+  - Manage people and projects
+  - Make ethical, evidenced-based decisions to solve problems
+- Mirrored the undergraduate formative-summative assessment regime
+  - MBA 700: Peregrine Academic Leveling Course Modules (ALC) for formative
+  - MBA 750: Simulation and project-based capstone course houses all summative assessment
+    - Course-embedded, rubric-graded projects and simulations
+    - Peregrine Exit Exam
+    - Student Exit Survey
+
+
+## 3. Multi-pronged Assessment Regime
+
+
+
+## 4. Automation of Data Collection Process
+
+- Internal Assessments
+  - Grading through LMS rubrics
+  - Batch export of assessment outcomes
+  - Supplementary data collection
+    - Instructors' impression and analysis
+    - Aggregate data if rubrics are not implemented (yet)
+- External Assessments
+  - Generated reports
+  - Individual record for customized report
+
+### Challenges & Solutions
+
+- Inconsistency in rubrics (e.g. word choices, typos, etc.)
+- Variations in the data sources (e.g. external/internal, rubric/exam, etc.)
+- Timely responses for feedback
+
+- Literal programming for reproducible analysis
+- Iterative data processing
+
+
+## 5. Data Analysis
+
+## Complementary Design in Action
+Challenge: Internal and external assessment outcomes are not directly comparable
+
+- Track the changes over time
+- Two-dimensional dynamics
+- Possible calibration
+
+### Complementary Design in Action
+
+Challenge: Internal and external assessment outcomes are not directly comparable
+
+- Track the changes over time
+- Two-dimensional dynamics
+- Possible calibration
+
+
+
+
+# An Assessment Story: Application
+
+## Assessing Leadership: Business Core
+
+- LO7: Discern ethical choices and critically evaluate the ethical choices of others.
+  - Internal: BUS 499 International ethics case Rows PLO7 a,b,c
+  - External: Peregrine Ethics
+- LO8: Evaluate socio-cultural and international diversity variables in decision making.
+  - Internal: BUS 499 International ethics case Rows PLO8 a,b,c
+  - External: Peregrine HR
+- LO9: Work collaboratively with and provide feedback to others in a team setting.
+  - Internal: Team Simulation Peer Feedback #2 overall score from rubric in D2L
+  - External: Peregrine Org Behavior
+- LO10: Reflect on personal leadership growth and potential.
+  - Internal: Final reflection paper. BUS 499 Reflection and Development Plan Rows 1 and 2
+  - External: Peregrine Leadership
+
+## Assessing Leadership: MGT Major
+
+- LO3: Suggest sound solutions to complex issues encountered when managing people and processes in organizations doing business in an inter-connected world.
+  - Internal: Rubric-graded final paper
+  - External: Peregrine International
+- LO4: Demonstrate interpersonal skills needed to work with individuals from various cultures and backgrounds.
+  - Internal: Reflection and Development Plan
+  - External: Peregrine Leadership
+
+## Assessing Leadership: MBA
+
+- MBA2: Manage projects using innovative leadership and communications skills through negotiating conflict and encouraging inclusive teamwork. 
+- MBA3: Make ethical, evidence-based decisions to solve complex business problems leveraging a variety of quantitative, qualitative, and technological tools.

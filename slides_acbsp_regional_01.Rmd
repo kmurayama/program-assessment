@@ -1,0 +1,191 @@
+---
+title: "Developing Leadership Skills through Assessment"
+subtitle: "ACBSP Region 2 Conference"
+author:
+  - Edmund Matecki^[Associate Professor of Economic, California University]
+  - Kentaro Murayama^[Visiting Assisstant Professor of Economics, California University]
+date: "November 5-6, 2020"
+output:
+  powerpoint_presentation:
+      reference_doc: my-style01.pptx
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Introduction
+
+## Learning Objectives
+After this presentation, attendees will be able to employ an advanced assessment of student learning outcomes methodology to develop leadership skills at their institution.
+
+
+# Overview
+
+## Motivation
+
+- Foster students' leadership skills in complex business environment and needs (Comprehensive knowledge, critical thinking skill, problem solving skill, etc.)
+- Needs assessment methods to achieve such a complexity
+- Maintain the feedback process between assessment and curriculum development in a timely, yet sustainable manner
+
+
+## Resources and Constraints
+
+- Abundance of data; but
+- Lack in structure
+
+
+## Challenges
+1. Need an effective methods to
+    - assess learning outcomes and
+    - improve curriculum.
+2. Need a sustainable implementation for such a method.
+
+
+## Solutions
+1. Multi-layered Assessment
+2. Curriculum Improvement from Assessment Outcomes
+3. Semi-automated Data Processing
+
+
+# Step 1: Design & Course Implimentation
+
+## Learning Objectives & Assessment Tools
+Establish learning objectives & assessment tools for
+
+- Core Courses
+- Programs (i.e. Concentration and Major/Minor)
+
+Each objective has both
+
+- External Assessment Tools
+- Internal Assessment Tools and
+
+## Standardized Objectives
+
+- Annual strategy meeting
+    - SMART objectives
+    - Alignment with the program goals
+- Signature Assignments
+    - Highly standardized assignments (questions, instructions, rubrics, etc.)
+    - While leaving rooms for flexibility in the rest of each course
+    - Clear association with the course learning objectives
+
+## Complementary Design
+- External Assessment Tools for
+    - Lower-level Learning
+    - Comprehensiveness in Contents
+    - Calibration of Assessment Levels
+- Internal Assessment Tools for
+    - Higher-level Learning
+    - Comprehensiveness in Modes
+    - Application and Critical Thinking
+
+
+## Standardized Exam
+Case: [Peregrine Exam](https://www.peregrineacademics.com/) category scores
+
+- Collect scores at the aggregate as well as category level
+- Used for external assessments
+
+
+## Standardized Rubrics
+
+- Disaggregated rows
+- Explicit correspondence to assessment
+
+## Example
+
+### Business Core 8
+
+Learning Objective: Evaluate socio-cultural and international diversity variables in decision making.
+
+- External Tool: Peregrine CPC Exam
+    - Use the total score of the "Management: Human Resource Management" category.
+    - Measure the share of students who meet the goal (i.e. US average score).
+    - Aims for 70% of students meeting the goal.
+- Internal Tool: Project Assignment "Ethics Case"
+    - Use three rubric rows marked with PLO8a, PLO8b, PLO8c.
+    - Measure the share of students who meet the goal (i.e. achievement level 3-5 out of 5 levels).
+    - Aims for 70% of students meeting the goal.
+    
+### Implementation
+
+A simple look-up table of objectives and assessment tools.
+
+- Broadly shared
+- Easily updated and maintained
+- Ready for programming and reporting
+
+![Look-up table of assessments](fig/lookup.png)
+
+# Step 2: Data Collection & Analysis
+
+## Rubrics in Leraning Management System
+Case: [D2L](https://www.d2l.com/) rubrics
+
+- Collect assessment outcomes at the individual row level
+- Supplementary data collection
+    - Course and assignment matched with D2L rubric IDs
+    - Instructors' impression and analysis collected
+- Used for internal assessments
+
+
+## Complementary Design in Action
+Challenge: Internal and external assessment outcomes are not directly comparable
+
+- Track the changes over time
+- Two-dimensional dynamics
+- Possible calibration
+
+
+## Data Processing
+
+### Challenges
+
+- Inconsistency in rubrics (e.g. word choices, typos, etc.)
+- Variations in the data sources (e.g. external/internal, rubric/exam, etc.)
+- Timely responses for feedback
+
+### Solutions
+
+- Literal programming for reproducible analysis
+- Iterative data processing
+
+## Example
+
+### Management 1 & 2
+
+Time plot shows the dynamics of assessment outcomes over academic years.
+
+![Management 1 time plot](fig/mgt1-timeplot.png)
+
+Scatter plots make it easier to interpret the dynamics of internal and external assessment outcomes *jointly*.
+
+![Magement scatter plot](fig/mgt-scatterplot.png)
+
+
+# Step 3: Feedback & Strategy Development
+
+## Annual Meeting & Strategy Development
+
+- Data analysis provided
+- Discuss the findings with additional qualitative information from discutants
+- Review the existing assessment tools in light of learning objectives
+- Propose changes in assessment tools (and/or learning objectives)
+
+
+## Continuous Feedback
+
+- Assessment Committee
+- Curriculum Development Committee
+- Individual faculty members (both regular and temporary)
+
+
+# Implementation and Outcome Example: Business Core
+
+
+# Conclusion
+
+
+
