@@ -1,0 +1,14 @@
+---
+title: "index"
+output: html_document
+---
+
+# 11/22/2020
+
+- Attempting to simplify the database Excel file, I started a [new note for annual report 02](note_annual-reports-02.html).
+- Meanwhile, finalized the [first note](note_annual-reports-01.html).
+
+# 11/26/2020
+
+- Finished up the annual report with the exported graphs using a [new note](note_annual-reports-03.html).
+

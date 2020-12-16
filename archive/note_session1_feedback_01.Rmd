@@ -2,11 +2,8 @@
 title: "Note to Reflect Feedback after 1st Session 01"
 date: "9/4/2020"
 output:
-  html_notebook:
-    toc: yes
-    toc_float:
-      collapsed: yes
-    code_folding: hide
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, echo=FALSE, include=FALSE}

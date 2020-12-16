@@ -3,10 +3,6 @@ title: "Note to Update External Direct 02"
 date: "9/4/2020"
 output:
   html_document:
-    toc: yes
-    toc_float:
-      collapsed: yes
-    code_folding: hide
     df_print: paged
 ---
 
@@ -197,8 +193,8 @@ Export Output Table
 Lastly export the output table for other use.
 
 ```{r, eval=FALSE}
-write_csv(x4, "out/ext-program-assessment.csv")
-write_csv(x5ref, "out/ext-core-assessment.csv")
+write_csv(x4, "ext-program-assessment.csv")
+write_csv(x5ref, "ext-core-assessment.csv")
 ```
 
 
@@ -364,10 +360,10 @@ Overall scores for MBA Peregrine is not in the mapping list.
 ttl <- "MBA Overall External Summative"
 subt <- "Assessment Tool: CPC Exam - Final Score"
 
-x0 <- x %>% filter(Degree == "MBA", Course == "Final Score", Specialization == "All")
-p0 <- draw_time(x0, "mean", ay = "AYn", ttl = ttl, subt = subt)
-ggsave("fig/MBA_Core/ext_all_final.png", p0,
-       height = 2, width = 3.5, units = "in")
+# x0 <- x %>% filter(Degree == "MBA", Course == "Final Score", Specialization == "All")
+# p0 <- draw_time(x0, "mean", ay = "AYn", ttl = ttl, subt = subt)
+# ggsave("fig/MBA_Core/ext_all_final.png", p0,
+#        height = 2, width = 3.5, units = "in")
 ```
 
 Conclusion

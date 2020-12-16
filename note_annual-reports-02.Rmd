@@ -1,0 +1,518 @@
+---
+title: "Note 01 for annual reports"
+date: "11/24/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+# knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+library(knitr)
+library(lubridate)
+datapath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+```
+
+# Objectives
+
+For the Middle State requirements (*Quality Assurance Report*), we need to have our outcome posted on our school website (https://www.calu.edu/academics/business/learning-outcomes/index.aspx).
+They don't have to be thorough and can cherry-pick to some degree. I'd like to make a mock up and check, then make those for all the programs.
+
+In this note, I test a different configuration of the data file.
+
+
+# New Database Layout
+
+Now the data are stored in separate worksheets. Load them all.
+
+```{r load}
+sns <- c("prg", "core", "mba")
+mns <- paste0("map_", sns)
+
+# strsplit("program	plo	type	source	ay	group	n	outcome", "\t")[[1]]
+
+ldf <- sapply(sns, function(x) read_excel(paste0(datapath, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
+lmp <- sapply(mns, function(x) read_excel(paste0(datapath, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
+```
+
+With the data set split into worksheets, it's straightforward to make graphs.
+
+```{r}
+ggplot(ldf$prg %>% filter(source == "Internal"), aes(ay, outcome, group = plo)) + geom_line()
+```
+
+It is easy to manipulate them.
+
+```{r}
+ldf$prg %>% pivot_wider(names_from = source, values_from = c(n, outcome))
+```
+
+## Recreate
+
+Now, recreate some visualizations.
+
+First element in the mapping:
+
+```{r}
+x <- lmp$map_prg[1, ]
+
+p <- ldf$prg %>% filter(plo == x$plo, type == x$type, source == x$source) %>% 
+  ggplot(aes(ay, outcome)) + geom_line(na.rm = TRUE) +
+  geom_hline(aes(yintercept = x$target), alpha = 0.4, color = "red") +
+  geom_point(size = 2, na.rm = TRUE)
+
+p <- p + scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+
+
+# tool <- asm_map %>% filter(plo == lo) %>% pull(des)
+ttl <- paste(x$plo, x$type, x$source)
+subt <- paste0("Assessment Tool: ", x$tool)
+p +
+  labs(title = ttl, subtitle = subt) +
+  xlab("Academic Year\nSample Size") +
+  ggthemes::theme_fivethirtyeight(base_size = 7) +
+  theme(legend.position = "right", legend.direction = "vertical")
+```
+
+ACC1 again but external:
+
+```{r}
+x <- lmp$map_prg %>% filter(plo == "ACC 1", source == "External")
+x
+
+p <- ldf$prg %>% filter(plo == x$plo, type == x$type, source == x$source) %>% 
+  ggplot(aes(ay, outcome)) + geom_line(na.rm = TRUE) +
+  geom_hline(aes(yintercept = x$target), alpha = 0.4, color = "red") +
+  geom_point(size = 2, na.rm = TRUE)
+
+p <- p + scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+
+
+# tool <- asm_map %>% filter(plo == lo) %>% pull(des)
+ttl <- paste(x$plo, x$type, x$source)
+subt <- paste0("Assessment Tool: ", x$tool)
+p +
+  labs(title = ttl, subtitle = subt) +
+  xlab("Academic Year\nSample Size") +
+  ggthemes::theme_fivethirtyeight(base_size = 7) +
+  theme(legend.position = "right", legend.direction = "vertical")
+```
+
+Comparison group data are missing, though. What organization would make sense?
+This is the database I draw information from. Robustness over flexibility. Store the reference as recorded in the mapping. (Task for external assessment script)
+
+## Process Internal Assessment
+
+### Prepare
+
+Using the new mapping files, process the internal assessments.
+Get codes from `note_inspecting_rubric_data08.Rmd` in `internal-direct` project.
+
+```{r}
+source('R/int_read.R')
+source('R/int_munge.R')
+# User level data
+names(mdf)
+head(mdf)
+
+# 1. Summarize to section, semester level
+# 2. Merge with non-rubric data
+# 3. Summarize to course level
+
+tbl1 <- mdf %>% filter(str_detect(Name, "Major|Minor", negate = TRUE)) %>%
+  group_by(Course, Section, Semester, Assessment, Name, PLO) %>%
+  summarise(Met.UND = mean(Met.UND.bin), Met.GRD = mean(Met.GRD.bin),
+            n = n_distinct(UserId),
+            Rubric = TRUE)
+miss <- read_excel(paste0(path, "D2L Missing Data Retrievals.xlsx"), "Scraped")
+miss <- miss %>% mutate(Rubric = FALSE) %>% 
+  select(-c(Unsatisfactory:Advanced)) %>% mutate(Met.UND = Met, Met.GRD = Met)
+tbl2 <- bind_rows(tbl1, miss)
+tbl3 <- tbl2 %>%
+  bind_rows(non %>% transmute(Course, Section, Semester, Assessment,
+                              Name = "No Rubric", PLO,
+                              Met.UND = np/n, Met.GRD = Met.UND, n,
+                              Rubric = FALSE))
+tbl4 <- tbl3 %>% 
+  group_by(Course, Assessment, Name, PLO, Rubric) %>%
+  summarise(Met.UND = weighted.mean(Met.UND, n, na.rm = TRUE),
+            Met.GRD = weighted.mean(Met.GRD, n, na.rm = TRUE),
+            n = sum(n, na.rm = TRUE), n.sec = n_distinct(Section)
+            ) %>% 
+  ungroup()
+```
+
+The same notebook extracts relevant rows from `tbl4`, but the rest of that notebook is rather complicated for no good reason. Time to simplify it.
+It will be useful when I revisit formative assessments later.
+
+The data `tbl4` contains `Course-Semester-Assessment-RubricRaw(Name)` data.
+Need to further aggregate for certain assessment criteria.
+
+```{r}
+table(tbl4$PLO)
+table(tbl4$Rubric)
+```
+
+### Select Program
+
+Use the keys in the mapping.
+
+```{r}
+# map1 <- lmp$map_prg %>% filter(source == "Internal")
+map1 <- lmp$map_prg %>% filter(group1 == "Course")
+
+tbl5 <- tbl4 %>% filter(PLO %in% map1$internal_rubric_tags)
+```
+
+
+```{r}
+lres <- list()
+for(i in 1:nrow(map1)){
+  x <- map1[i, ]
+  lres[[i]] <- tbl5 %>%
+    filter(PLO == x$internal_rubric_tags,
+           str_detect(Name, x$internal_rubric_keys2019)) %>% 
+    mutate(plo = x$plo)
+}
+
+
+# Summarized for PLOs
+tbl_assess <- bind_rows(lres) %>%
+  group_by(plo) %>%
+  summarize(Met = mean(Met.UND), n = max(n))
+```
+
+```{r}
+write_csv(tbl_assess, "out/prg_internal.csv")
+```
+
+### Select Core
+
+Likewise, filter out from `tbl4`
+
+```{r}
+map1c <- lmp$map_core %>% filter(group1 == "Course")
+
+tbl5c <- tbl4 %>% filter(PLO %in% map1c$internal_rubric_tags)
+```
+
+```{r}
+lres <- list()
+for(i in 1:nrow(map1c)){
+  x <- map1c[i, ]
+  lres[[i]] <- tbl5c %>%
+    filter(PLO == x$internal_rubric_tags,
+           str_detect(Name, x$internal_rubric_keys2019)) %>% 
+    mutate(plo = x$plo)
+}
+
+# Summarized for PLOs
+tbl_assess <- bind_rows(lres) %>%
+  group_by(plo) %>%
+  summarize(Met = mean(Met.UND), n = max(n))
+```
+
+But also want a disaggregation of the scores.
+Brute force. From `int_prepare.R`
+
+```{r}
+attr <- mdf %>% filter(str_detect(Name, "Major|Minor")) %>% 
+  select(RubricId, UserId, Course, Assessment, Name, LevelAchieved.Original)
+attr.unq <- attr %>% distinct()
+# dim(attr); dim(attr.unq)
+
+majors <- attr.unq %>% filter(Name == "Major")
+majors.buscore <- majors %>% filter(Course == "BUS 499")
+
+pttrn.major <- c("General Busines{1,3}" = "ISBC",
+                 "Interdisciplinary Studies In Business And Commerce" = "ISBC",
+                 "Integrated Global Business.*" = "ISBC")
+majors.buscore <- majors.buscore %>%
+  mutate(Major = str_to_title(LevelAchieved.Original),
+         Major = str_replace_all(Major, pttrn.major))
+# table(majors.buscore$Major)
+# head(majors.buscore)
+sdf <- mdf %>% filter(Course == "BUS 499") %>%
+  left_join(majors.buscore %>% select(RubricId, UserId, Major),
+            by = c("RubricId", "UserId"))
+
+res <- sdf %>% filter(str_detect(Name, "Major|Minor", negate = TRUE)) %>%
+  group_by(Assessment, Name, PLO, Major) %>%
+  summarise(Met.UND = mean(Met.UND.bin), Met.GRD = mean(Met.GRD.bin),
+            n = n_distinct(UserId))
+lres <- list()
+lres[["PLO2"]] <- res %>% filter(str_detect(Name, "Plo2")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 2)
+lres[["PLO3"]] <- res %>% filter(str_detect(Name, "Plo3")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 3)
+lres[["PLO4"]] <- res %>% filter(str_detect(Name, "Plo4")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 4)
+lres[["PLO5"]] <- res %>% filter(str_detect(Name, "5[a|b|c|d]")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 5)
+lres[["PLO6"]] <- res %>% filter(str_detect(Name, "6[e|f|g]")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 6)
+lres[["PLO7"]] <- res %>% filter(str_detect(Name, "Plo7")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 7)
+lres[["PLO8"]] <- res %>% filter(str_detect(Name, "Plo8")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 8)
+lres[["PLO9"]] <- res %>% filter(str_detect(Name, "Plo9")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 9)
+lres[["PLO10"]] <- res %>% filter(str_detect(Name, ".*")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 10)
+out <- bind_rows(lres)
+
+out_wide <- pivot_wider(out, id_cols = PLO, names_from = Major, values_from = c(Met, n))
+```
+
+```{r}
+write_csv(out_wide, "out/core_internal.csv")
+```
+
+## Process External Assessment
+
+### Prepare
+
+Import individual data and benchmark scores.
+```{r}
+fn <- "External Direct Comparison//IndividualResults_UND.xlsx"
+tmp1 <- read_excel(paste0(datapath, fn), sheet = 2, skip = 5)
+fn <- "External Direct Comparison//IndividualResults_MBA.xlsx"
+tmp2 <- read_excel(paste0(datapath, fn), sheet = 2, skip = 5)
+tmp3 <- bind_rows(tmp1, tmp2)
+names(tmp3)[1] <- "ID"
+
+mdf <- tmp3 %>% select(-(Learner:`Student ID`)) # Remove private information
+
+rm(list = ls(pattern = "tmp?"))
+```
+```{r}
+fn <- "External Direct Comparison//External Direct Comparison.xlsx"
+ref <- read_excel(paste0(datapath, fn), "Both")
+names(ref) <- c("Course", "Timeline", "Score", "ACBSP_US", "ACBSP_R2", "US",
+                "MSCHE", "Public", "Degree")
+```
+Create variables, reshape data set, and merge benchmark score data.
+```{r}
+mdf <- mdf %>%
+  mutate(
+    Time = ymd_hms(Completed),
+    AY = case_when(
+      Time %within% interval(ymd("2016-06-01"), ymd("2017-05-31")) ~ "2016",
+      Time %within% interval(ymd("2017-06-01"), ymd("2018-05-31")) ~ "2017",
+      Time %within% interval(ymd("2018-06-01"), ymd("2019-05-31")) ~ "2018",
+      Time %within% interval(ymd("2019-06-01"), ymd("2020-05-31")) ~ "2019",
+      TRUE ~ "Other"),
+    Major = `Identify Your Major or Concentration`,
+    Minor = `Identify Your Minor or Certificate`,
+    Specialization = `MBA Specialization`,
+    Degree = Program)
+
+# Filter entries with less than 30 min spent
+mdf.original <- mdf
+mdf <- mdf %>% filter(`Duration (min)` > 30)
+
+# Reshape the data
+lmdf <- mdf %>% select(-c(Timeline, Faculty, Course)) %>% 
+  pivot_longer(cols = c(Accounting:`Final Score`),
+               names_to = "Course", values_to = "Score")
+# Merge the benchmark scores and compute differences
+# Need this at this stage in order to summarize prevelence of achievements
+lmdf <- lmdf %>%
+  left_join(ref %>% select(Course, ACBSP_US, ACBSP_R2, US, Degree),
+            by = c("Degree", "Course")) %>% 
+  mutate(Diff = Score - US)
+
+# Name has changed 2019 for *General Business* to *ISBC* (along with the program
+# change). Count them together.
+genbus <- "(General Business)|(Integrated Global Business)|(Interdisciplinary Studies in Business and Commerce)"
+lmdf <- lmdf %>%
+  mutate(Major = str_replace(Major, genbus, "ISBC"),
+         Degree = str_replace(Degree, "BS", "UND"))
+```
+Aggregate by different level (all business major, by major, by specialization).
+```{r}
+# Aggregate: All students
+tbl1 <- lmdf %>% group_by(Degree, AY, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>%
+  mutate(Major = "All", Specialization = "All")
+# Disaggregate: By major
+tbl2 <- lmdf %>% filter(Degree == "UND") %>% 
+  group_by(AY, Major, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>% 
+  mutate(Degree = "UND")
+# Disaggregate: By specialization
+tbl3 <- lmdf %>% filter(Degree == "MBA") %>% 
+  group_by(AY, Specialization, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>% 
+  mutate(Degree = "MBA")
+tbl_all <- bind_rows(tbl1, tbl2, tbl3)
+# tbl_und <- bind_rows(tbl1 %>% select(-Specialization), tbl2)
+# tbl_mba <- bind_rows(tbl2 %>% select(-Major), tbl3)
+
+# Re-introduce benchmark. Use only US.
+ref <- ref %>% mutate(Degree = str_replace(Degree, "BS", "UND"))
+tbl_all <- tbl_all %>%
+  left_join(ref %>% select(Degree, Course, US),
+            by = c("Degree", "Course")) %>% 
+  mutate(US = US/100)
+```
+
+### Select Program
+
+Need rework on the list to go over.
+
+```{r}
+map2 <- lmp$map_prg %>% filter(source == "External")
+names(map2)
+```
+
+Compare the main group and "control group." (Need renaming...)
+
+```{r}
+# Extract relevant rows from the outcome summary
+# while adding the identification information
+lres <- list()
+for(i in 1:nrow(map2)){
+  x <- map2[i, ]
+  z1 <- tbl_all %>%
+    filter(Degree == "UND", Major == x$group2, Course == x$tool) %>%
+    select(AY, Degree, Major, Course, n, mean, met, US) %>% 
+    mutate(Program = x$program, PLO = x$plo)
+  z2 <- tbl_all %>%
+    filter(Degree == "UND", Major == x$external_control_group, Course == x$tool) %>%
+    select(AY, Degree, Control = Major, n_ctrl = n, mean_ctrl = mean, met_contrl = met)
+  lres[[i]] <- left_join(z1, z2, by = c("AY", "Degree"))
+}
+out_program <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
+```
+
+```{r}
+write_csv(out_program, "out/prg_external.csv")
+```
+
+### Select Core
+
+Core is a bit different and I need to add more procedures.
+
+```{r}
+# map3 <- lmp$map_core %>% filter(source == "External")
+map3 <- lmp$map_core %>% filter(group1 == "CPC")
+map3
+```
+
+```{r}
+# Extract relevant rows from the outcome summary
+# while adding the identification information
+lres <- list()
+for(i in 1:nrow(map3)){
+  x <- map3[i, ]
+  dfx <- tbl_all %>% filter(Degree == "UND", Major == x$group2, Course == x$tool)
+  lres[[i]] <- dfx %>% select(AY, Degree, Major, Course, n, mean, met, US) %>% 
+    mutate(Program = x$program, PLO = x$plo, Source = x$source)
+}
+out_core <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
+out_core
+```
+
+Need disaggregation of assessment outcomes for core objectives.
+Get the program names and corresponding major names in the Peregrine.
+
+```{r}
+lres <- list()
+lmaj <- levels(factor(tbl_all$Major))
+k <- 0
+for(i in 1:nrow(map3)){
+  x <- map3[i, ]
+  for(j in 1:length(lmaj)){
+    y <- lmaj[j]
+    k <- k + 1
+    # print(c(i, j, k))
+    dfx <- tbl_all %>% filter(Degree == "UND", Major == y, Course == x$tool)
+    lres[[k]] <- dfx %>% select(AY, Degree, Major, Course, n, mean, met, US) %>%
+      mutate(Program = x$program, PLO = x$plo, Source = x$source)
+  }
+}
+out_core_dis <- bind_rows(lres)
+```
+
+
+Merge the outcomes
+
+```{r}
+core_dis <- pivot_wider(out_core_dis, id_cols = c(AY, PLO, Source), names_from = Major, values_from = c(mean, met, n))
+out_core_full <- out_core %>% left_join(core_dis, by = c("AY", "PLO", "Source")) %>% arrange(Source, PLO, AY) %>% relocate(Source, PLO, AY)
+```
+
+```{r}
+write_csv(out_core_full, "out/core_external.csv")
+```
+
+
+### Select MBA
+
+Specialization instead of major. Rest is the same.
+
+```{r}
+map4 <- lmp$map_mba %>% filter(group1 == "CPC")
+map4
+```
+
+```{r}
+# Extract relevant rows from the outcome summary
+# while adding the identification information
+lres <- list()
+for(i in 1:nrow(map4)){
+  x <- map4[i, ]
+  dfx <- tbl_all %>% filter(Degree == "MBA", Major == x$group2, Course == x$tool)
+  lres[[i]] <- dfx %>% select(AY, Degree, Major, Course, n, mean, met, US) %>% 
+    mutate(Program = x$program, PLO = x$plo, Source = x$source)
+}
+out_core <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
+out_core
+```
+
+
+```{r}
+lres <- list()
+lmaj <- levels(factor(tbl_all$Specialization))
+k <- 0
+for(i in 1:nrow(map4)){
+  x <- map4[i, ]
+  for(j in 1:length(lmaj)){
+    y <- lmaj[j]
+    k <- k + 1
+    dfx <- tbl_all %>% filter(Degree == "MBA", Specialization == y, Course == x$tool)
+    lres[[k]] <- dfx %>% select(AY, Degree, Specialization, Course, n, mean, met, US) %>%
+      mutate(Program = x$program, PLO = x$plo, Source = x$source)
+  }
+}
+out_core_dis <- bind_rows(lres)
+out_core_dis
+```
+
+
+Merge the outcomes
+
+```{r}
+core_dis <- pivot_wider(out_core_dis, id_cols = c(AY, PLO, Source), names_from = Specialization, values_from = c(mean, met, n))
+out_core_full <- out_core %>% left_join(core_dis, by = c("AY", "PLO", "Source"))  %>% arrange(Source, PLO, AY) %>% relocate(Source, PLO, AY)
+out_core_full
+```
+```{r}
+write_csv(out_core_full, "out/mba_external.csv")
+```
+
+Still need improvements though.
+
+- MBA lacking 2016
+- Column names? (See the resulting sheets and find improvments)
+
+
+# Next
+
+With the updates, I have a full set of the data. Now, let's update analysis.
+Archive this note and start a new one. Make the process codes independent as well.

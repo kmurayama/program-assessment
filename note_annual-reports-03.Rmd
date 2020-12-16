@@ -1,0 +1,239 @@
+---
+title: "Note 03 for annual reports"
+output: html_notebook
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+# knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+library(knitr)
+library(lubridate)
+datapath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+```
+
+# Objectives
+
+For the Middle State requirements (*Quality Assurance Report*), we need to have our outcome posted on our school website (https://www.calu.edu/academics/business/learning-outcomes/index.aspx).
+
+In the previous note, I assured that the 2019 data process is done properly with the new orientation of the data base file.
+In this note, create visualizations with the new data set.
+
+
+# Data
+
+```{r load}
+# File names and worksheet names
+fn <- paste0(datapath, "Assessment Data Main.xlsx")
+sns <- c("prg", "core", "mba")
+mns <- paste0("map_", sns)
+
+# Load data and mappings into lists
+ldf <- sapply(sns, function(x) read_excel(fn, x),
+              simplify = FALSE, USE.NAMES = TRUE)
+lmp <- sapply(mns, function(x) read_excel(fn, x),
+              simplify = FALSE, USE.NAMES = TRUE)
+```
+
+Data are stored in three sets: Program, Core, and MBA.
+
+```{r}
+names(ldf); names(lmp)
+```
+
+They have the same columns for identification (`program`, `plo`, `type`, `source`, `ay`) and outcomes (`n` and `outcome`).
+Core and MBA outcomes also have disaggregation by majors/specializations.
+
+```{r}
+sapply(ldf, names)
+```
+
+# Time Plots
+
+Generic functions are nice, but not necessary for this.
+The data are well formatted and little applications outside of them.
+Set the format with a function and that's about it.
+
+```{r}
+draw_time <- function(sn, i, y1 = "outcome", y2 = NULL){
+  # Take a map "map_{sn}" and pick the {i}_th entry
+  x <- lmp[[paste("map", sn, sep = "_")]][i, ]
+  
+  # Use the corresponding data
+  y <- ldf[[sn]]
+  p <- y %>% filter(plo == x$plo, type == x$type, source == x$source) %>% 
+    ggplot(aes_string("ay", y1)) +
+    geom_line(na.rm = TRUE, linetype = 1) + geom_point(size = 2, na.rm = TRUE) +
+    geom_hline(aes(yintercept = x$target), alpha = 0.4, color = "red") +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L)) 
+  
+  if(!is.null(y2)){
+    p <- p + 
+      geom_line(aes_string(y = y2), na.rm = TRUE, linetype = 2) +
+      geom_point(aes_string(y = y2), size = 2, na.rm = TRUE)
+  }
+  
+  ttl <- paste(x$plo, x$type, x$source)
+  subt <- paste0("Assessment Tool: ", x$tool_description)
+  p + labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    ggthemes::theme_fivethirtyeight(base_size = 7) +
+    theme(legend.position = "right", legend.direction = "vertical")
+}
+
+draw_time("prg", 1)
+draw_time("prg", 25, y2 = "All")
+draw_time("core", 1)
+draw_time("core", 1, y2 = "acc")
+draw_time("mba", 1)
+draw_time("mba", 1, y2 = "ba")
+
+```
+
+- Long format, so that legend can be produced easily?
+- Count in note, so that it doesn't take much space?
+
+```{r}
+y2 <- "All"
+x <- lmp$map_prg[25, ]
+y <- ldf$prg %>% filter(plo == x$plo, type == x$type, source == x$source)
+z <- pivot_longer(y, cols = c(outcome, All), names_to = "Type", values_to = "outcome")
+ggplot(z, aes(ay, outcome, group = Type)) + geom_point() + geom_line(aes(linetype = Type))
+```
+
+This is easier... Adjust names? Want something consistent with other data.
+Adjustment with the mapping would be needed...
+
+Currently the program mapping has `group1` to indicate the type of data group like "CPC" and then `group2` indicates actual group ("Major" in the case of CPC) like "Accounting".
+Yet, the comparison group is indicated by `external_control_group` inconsistently.
+Meanwhile, core and mba lack those comparison groups in the mapping. Yet implicitly compare with all the groups present in the data.
+
+```{r}
+head(ldf$prg)
+head(ldf$core)
+head(lmp$map_core)
+head(lmp$map_prg)
+```
+
+The idea of `group` variable is to use it as an identifier, filtering data in rubric data (internal) or in Peregrine data (external).
+I can still use it, while combining it with other identifier.
+
+Use
+
+- group_type
+- group_main
+- group_comp
+
+for program, and
+
+- group_type
+- group_main
+
+for core and mba.
+
+Outcome data sheets can have
+
+- n_main
+- outcome_main
+- n_comp
+- outcome_comp
+- etc.
+
+Try:
+
+```{r}
+ldf$prg <- ldf$prg %>% rename(main_outcome = outcome, main_n = n, comp_outcome = All, comp_n = n_All)
+ldf$core <- ldf$core %>% rename(main_outcome = outcome, main_n = n) %>% rename_with(~ paste0(.x, "_outcome"), acc:mkt)
+ldf$mba <- ldf$mba %>% rename(main_outcome = outcome, main_n = n) %>% rename_with(~ paste0(.x, "_outcome"), ba:hm)
+
+lmp$map_prg <- lmp$map_prg %>% rename(group_type = group1, group_main = group2, group_comp = external_control_group)
+lmp$map_core <- lmp$map_core %>% rename(group_type = group1, group_main = group2)
+lmp$map_mba <- lmp$map_mba %>% rename(group_type = group1, group_main = group2)
+```
+
+Work with those names. Later, once moving on to the next notebook, I can update the data file.
+
+Update the previous function accordingly.
+
+```{r}
+x <- lmp$map_prg[25, ]
+y <- ldf$prg %>% filter(plo == x$plo, type == x$type, source == x$source)
+z <- pivot_longer(y, cols = ends_with("outcome"), names_to = "Type", values_to = "Outcome")
+ggplot(z, aes(ay, Outcome, group = Type)) + geom_point() + geom_line(aes(linetype = Type))
+```
+
+
+```{r}
+x <- lmp$map_core[11, ]
+y <- ldf$core %>% filter(plo == x$plo, type == x$type, source == x$source)
+select(y, ends_with("outcome"))
+z <- pivot_longer(y, cols = ends_with("outcome"), names_to = "Type", values_to = "Outcome")
+ggplot(z %>% filter(Type %in% c("main_outcome", "acc_outcome")), aes(ay, Outcome, group = Type)) + geom_point() + geom_line(aes(linetype = Type))
+names(y)
+y %>% select(plo, type, source, starts_with(c("main", c("acc", "eco"))))
+```
+
+```{r}
+draw_time <- function(sn, i, y1 = "main", y2 = NULL){
+  x <- lmp[[paste("map", sn, sep = "_")]][i, ]
+  y <- ldf[[sn]] %>% filter(plo == x$plo, type == x$type, source == x$source)
+  if(!is.null(y2)){
+    y <- y %>% select(plo, type, source, ay, starts_with(c(y1, y2)))
+  }
+  z <- pivot_longer(y, cols = ends_with("outcome"),
+                    names_to = "Type", values_to = "Outcome")
+  
+  p <- ggplot(z, aes(ay, Outcome, group = Type)) +
+    geom_line(aes(linetype = Type), na.rm = TRUE) +
+    geom_point(size = 2, na.rm = TRUE) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L)) 
+  # Using the map (x), add the target level
+  p <- p + geom_hline(aes(yintercept = x$target), alpha = 0.4, color = "red")
+  
+  ttl <- paste(x$plo, x$type, x$source)
+  subt <- paste0("Assessment Tool: ", x$tool_description)
+  p + labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    ggthemes::theme_fivethirtyeight(base_size = 7) +
+    theme(legend.position = "right", legend.direction = "vertical")
+}
+
+draw_time("prg", 1)
+draw_time("prg", 25, y2 = "comp")
+draw_time("core", 1)
+draw_time("core", 1, y2 = "acc")
+draw_time("core", 1, y2 = c("acc", "eco"))
+draw_time("mba", 1)
+draw_time("mba", 1, y2 = "ba")
+```
+
+Okay, sufficient flexibility.
+
+# Other Plots
+
+## Core Across Groups
+
+```{r}
+x <- ldf$core %>% select(program:ay, ends_with("outcome")) %>% filter(plo == "BUS 1", source == "External") %>% pivot_longer(cols = ends_with("outcome"))
+
+ggplot(x %>% mutate(name = str_remove(name, "_outcome")), aes(name, value)) + geom_col() + facet_wrap(vars(ay))
+```
+
+```{r}
+x <- ldf$core %>% select(program:ay, ends_with("outcome")) %>% filter(source == "External") %>% pivot_longer(cols = ends_with("outcome"))
+x <- x %>% mutate(name = str_remove(name, "_outcome"), plo = str_remove(plo, "BUS "))
+x
+ggplot(x %>% filter(ay == 2019), aes(plo, value - 0.7)) + geom_col() + facet_wrap(vars(name))
+ggplot(x %>% filter(ay == 2018), aes(plo, value - 0.7)) + geom_col() + facet_wrap(vars(name))
+```
+
+
+```{r}
+x <- ldf$core %>% select(program:ay, ends_with("outcome")) %>% filter(source == "Internal") %>% pivot_longer(cols = ends_with("outcome"))
+x <- x %>% mutate(name = str_remove(name, "_outcome"), plo = str_remove(plo, "BUS "))
+
+ggplot(x %>% filter(ay == 2019), aes(plo, value - 0.7)) + geom_col() + facet_wrap(vars(name))
+```
+

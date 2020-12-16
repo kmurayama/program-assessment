@@ -13,6 +13,7 @@ data/*
 fig/*
 out/*
 
+*/out/*
 */*_cache/*
 */*_files/*
 */libs/*

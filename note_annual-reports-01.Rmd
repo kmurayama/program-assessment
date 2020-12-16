@@ -1,0 +1,187 @@
+---
+title: "Note 01 for annual reports"
+date: "11/22/2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+# knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+library(knitr)
+library(lubridate)
+datapath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+```
+
+# Objectives
+
+For the Middle State requirements (*Quality Assurance Report*), we need to have our outcome posted on our school website (https://www.calu.edu/academics/business/learning-outcomes/index.aspx).
+They don't have to be through and can cherry-pick to some degree. I'd like to make a mock up and check, then make those for all the programs.
+
+This is also a good chance to go over the outcomes/findings before the conference presentaiton.
+
+
+# Plan
+
+First, I'd like to make sure I have all the data visualizations. At the moment of writing, there seems to be some issues with internal direct assessments.
+Then, I will make a minimal example to share with others. I only have a couple of days, so this is likely outcomes.
+Finally, if time allows, I'd like to make more condense version similar to the style of conference posters.
+
+I need to have some scripts:
+- Rubric data to internal assessment
+- Peregrine data to external assessment
+- Retrieval of existing assessment outcomes
+
+
+# Data Visualization
+
+Notes are all over the place and hard to keep track of them.
+As a solution, I created an index file that will link to all the notes with descriptions.
+
+All the visualizations are derived from the up-to-date database, incorporating the past assessment results and the latest outcomes.
+For data generation of the latest outcome, refer to the following:
+- `note_update_ext_direct_02.Rmd`
+
+```{r load}
+program <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Program")
+core <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Core1")
+asm_map <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Mapping")
+```
+
+```{r}
+draw_time <- function(lo, ori, typ, stgrp,
+                      ay = "ay", compare = FALSE, use_core = FALSE){
+  # Given the data import: program, core, asm_map
+  # Specify column names (mostly internal vs external)
+  ay <- "ay"
+  if(ori == "External"){
+    outcome <- "external_outcome"
+    goal <- "external_goal"
+    grp <- "external_group"
+    des <- "external_tool_description"
+  }else{
+    outcome <- "internal_outcome"
+    goal <- "internal_goal"
+    grp <- "internal_group"
+    des <- "internal_tool_description"
+  }
+  # Select data and mapping
+  if(use_core){
+    x <- core %>% filter(plo == lo, type == typ, .data[[grp]] == stgrp)
+  }else{
+    x <- program %>% filter(plo == lo, type == typ, .data[[grp]] == stgrp)
+  }
+  y <- asm_map %>% filter(plo == lo, type == typ)
+  
+  # Create titles
+  tool <- asm_map %>% filter(plo == lo) %>% pull(des)
+  ttl <- paste(lo, ori, typ)
+  subt <- paste0("Assessment Tool: ", str_trunc(tool, 50, "right"))
+  # Base plot
+  p <- ggplot(x, aes_string(ay, outcome)) +
+    geom_hline(data = y, aes_string(yintercept = goal),
+               alpha = 0.4, color = "red", na.rm = TRUE)
+  if(compare){
+    p <- p +
+      geom_line(aes_string(group = grp, linetype = grp), na.rm = TRUE) +
+      geom_point(aes_string(group = grp, shape = grp), size = 2, na.rm = TRUE) +
+      scale_shape_manual(values = c(16, 1), labels = c("Focus", "All Business")) +
+      scale_linetype(labels = c("Focus", "All Business")) +
+      scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+    # Update subtitle
+    subt <- paste0(subt, "\nFocus Group: ", stgrp)
+  } else{
+    # Add data (No comparison)
+    p <- p + geom_line(aes_string(), na.rm = TRUE) +
+      geom_point(aes_string(), size = 2, na.rm = TRUE) +
+      scale_y_continuous(labels=scales::percent_format(accuracy = 5L))
+  }
+  # Decorate
+  p <- p +
+    labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    ggthemes::theme_fivethirtyeight(base_size = 7) +
+    theme(legend.position = "right", legend.direction = "vertical")
+  
+  # print(paste(lo, ori, typ, stgrp))
+  # print(paste(outcome, goal, grp))
+  # return(list(x, y, p))
+  p
+}
+
+draw_time(lo = "ACC 1", ori = "External", typ = "Summative", stgrp = "Accounting")
+draw_time(lo = "BUS 1", ori = "External", typ = "Summative", stgrp = "All", use_core = TRUE)
+draw_time(lo = "BUS 1", ori = "External", typ = "Summative", stgrp = "Accounting", use_core = TRUE)
+draw_time(lo = "ACC 1", ori = "Internal", typ = "Summative", stgrp = "Course")
+```
+
+
+```{r}
+dir.create("out")
+dir.create("out/und_core/")
+# test <- draw_time(lo = "ACC 1", ori = "External", typ = "Summative", stgrp = "Accounting Major")
+# ggsave("fig/und_core/test.png", test,
+#        height = 2, width = 3.5, units = "in")
+```
+
+```{r}
+dir.create("out/und_prog/")
+for(i in 1:nrow(asm_map)){
+  x <- asm_map[i, ]
+  p <- draw_time(lo = x$plo, ori = "Internal", typ = x$type, stgrp = x$internal_group)
+  # print(p)
+  fn <- paste0("out/und_prog/", x$plo, "_int_", x$type, ".png")
+  print(paste("Save ", fn, "..."))
+  ggsave(fn, p,
+         height = 2, width = 3.5, units = "in")
+}
+```
+
+```{r}
+for(i in 1:nrow(asm_map)){
+  x <- asm_map[i, ]
+  p <- draw_time(lo = x$plo, ori = "External", typ = x$type, stgrp = x$external_group)
+  # print(p)
+  fn <- paste0("out/und_prog/", x$plo, "_ext_", x$type, ".png")
+  print(paste("Save ", fn, "..."))
+  ggsave(fn, p,
+         height = 2, width = 3.5, units = "in")
+}
+```
+
+```{r}
+dir.create("out/und_core/")
+
+m <- filter(asm_map, core)
+
+for(i in 1:nrow(m)){
+  x <- m[i, ]
+  p <- draw_time(lo = x$plo, ori = "External", typ = x$type, stgrp = "All", use_core = TRUE)
+  # print(p)
+  fn <- paste0("out/und_core/", x$plo, "_ext_", x$type, ".png")
+  cat(paste("Save ", fn, "..."))
+  ggsave(fn, p,
+         height = 2, width = 3.5, units = "in")
+}
+for(i in 1:nrow(m)){
+  x <- m[i, ]
+  p <- draw_time(lo = x$plo, ori = "Internal", typ = x$type, stgrp = "All", use_core = TRUE)
+  # print(p)
+  fn <- paste0("out/und_core/", x$plo, "_int_", x$type, ".png")
+  cat(paste("Save ", fn, "..."))
+  ggsave(fn, p,
+         height = 2, width = 3.5, units = "in")
+}
+```
+
+
+# Closing
+
+The note served its purpose. The annual reports are compiled manually, using the graphs produced here. Finalize this note.
+
+Next, update the database Excel file and re-create the outcomes here. Produce more elaborate version of annual reports. Also, start planning for formative assessments.
+
