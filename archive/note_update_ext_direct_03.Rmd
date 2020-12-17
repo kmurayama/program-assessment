@@ -1,0 +1,222 @@
+---
+title: "Note to Update External Direct 03"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+# knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+library(knitr)
+library(lubridate)
+datapath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+```
+
+```{r load}
+asm_map <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Mapping")
+```
+
+Individual Peregrine to Summary
+--------------------------------------------------------------------------------
+Import individual data and benchmark scores.
+```{r}
+fn <- "External Direct Comparison//IndividualResults_UND.xlsx"
+tmp1 <- read_excel(paste0(datapath, fn), sheet = 2, skip = 5)
+fn <- "External Direct Comparison//IndividualResults_MBA.xlsx"
+tmp2 <- read_excel(paste0(datapath, fn), sheet = 2, skip = 5)
+tmp3 <- bind_rows(tmp1, tmp2)
+names(tmp3)[1] <- "ID"
+
+mdf <- tmp3 %>% select(-(Learner:`Student ID`)) # Remove private information
+
+rm(list = ls(pattern = "tmp?"))
+```
+
+
+```{r}
+fn <- "External Direct Comparison//External Direct Comparison.xlsx"
+ref <- read_excel(paste0(datapath, fn), "Both")
+names(ref) <- c("Course", "Timeline", "Score", "ACBSP_US", "ACBSP_R2", "US",
+                "MSCHE", "Public", "Degree")
+```
+
+Create variables, reshape data set, and merge benchmark score data.
+```{r}
+mdf <- mdf %>%
+  mutate(
+    Time = ymd_hms(Completed),
+    AY = case_when(
+      Time %within% interval(ymd("2016-06-01"), ymd("2017-05-31")) ~ "2016",
+      Time %within% interval(ymd("2017-06-01"), ymd("2018-05-31")) ~ "2017",
+      Time %within% interval(ymd("2018-06-01"), ymd("2019-05-31")) ~ "2018",
+      Time %within% interval(ymd("2019-06-01"), ymd("2020-05-31")) ~ "2019",
+      TRUE ~ "Other"),
+    Major = `Identify Your Major or Concentration`,
+    Minor = `Identify Your Minor or Certificate`,
+    Specialization = `MBA Specialization`,
+    Degree = Program)
+
+# Filter entries with less than 30 min spent
+mdf.original <- mdf
+mdf <- mdf %>% filter(`Duration (min)` > 30)
+
+# Reshape the data
+lmdf <- mdf %>% select(-c(Timeline, Faculty, Course)) %>% 
+  pivot_longer(cols = c(Accounting:`Final Score`),
+               names_to = "Course", values_to = "Score")
+# Merge the benchmark scores and compute differences
+# Need this at this stage in order to summarize prevelence of achievements
+lmdf <- lmdf %>%
+  left_join(ref %>% select(Course, ACBSP_US, ACBSP_R2, US, Degree),
+            by = c("Degree", "Course")) %>% 
+  mutate(Diff = Score - US)
+
+# Name has changed 2019 for *General Business* to *ISBC* (along with the program
+# change). Count them together.
+lmdf <- lmdf %>%
+  mutate(Major = str_replace(Major,"Interdisciplinary Studies in Business and Commerce", "General Business"),
+         Degree = str_replace(Degree, "BS", "UND"))
+
+```
+
+Aggregate by different level (all business major, by major, by specialization).
+```{r}
+# Aggregate: All students
+tbl1 <- lmdf %>% group_by(Degree, AY, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>%
+  mutate(Major = "All", Specialization = "All")
+# Disaggregate: By major
+tbl2 <- lmdf %>% filter(Degree == "UND") %>% 
+  group_by(AY, Major, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>% 
+  mutate(Degree = "UND")
+# Disaggregate: By specialization
+tbl3 <- lmdf %>% filter(Degree == "MBA") %>% 
+  group_by(AY, Specialization, Course) %>% 
+  summarise(mean = mean(Score, na.rm = TRUE)/100,
+            mean_diff = mean(Diff, na.rm = TRUE)/100,
+            met = mean(Diff >0, na.rm = TRUE),
+            n = n_distinct(ID)) %>% 
+  mutate(Degree = "MBA")
+tbl_all <- bind_rows(tbl1, tbl2, tbl3)
+# tbl_und <- bind_rows(tbl1 %>% select(-Specialization), tbl2)
+# tbl_mba <- bind_rows(tbl2 %>% select(-Major), tbl3)
+
+# Re-introduce benchmark. Use only US.
+ref <- ref %>% mutate(Degree = str_replace(Degree, "BS", "UND"))
+tbl_all <- tbl_all %>%
+  left_join(ref %>% select(Degree, Course, US),
+            by = c("Degree", "Course")) %>% 
+  mutate(US = US/100)
+```
+
+
+```{r}
+dim(tbl_all)
+summary(tbl_all)
+```
+
+
+Outcome Table
+--------------------------------------------------------------------------------
+
+### Program Level Assessment
+Using the mapping, extract relevant information.
+```{r}
+# Extract relevant rows from the outcome summary
+# while adding the identification information
+lres <- list()
+for(i in c(1:nrow(asm_map))){
+  # Selectors
+  course <- asm_map[[i, "external_tool"]]
+  degree <- asm_map[[i, "degree"]]
+  major <- asm_map[[i, "external_group"]]
+  control <- asm_map[[i, "external_control_group"]]
+  # Identifier
+  program <- asm_map[[i, "program"]]
+  plo <- asm_map[[i, "plo"]]
+  # Populate the list by extracting
+  z1 <- tbl_all %>%
+    filter(Degree == degree, Major == major, Course == course) %>%
+    select(AY, Degree, Major, Course, n, mean, met, US) %>% 
+    mutate(Program = program, PLO = plo)
+  z2 <- tbl_all %>%
+    filter(Degree == degree, Major == control, Course == course) %>%
+    select(AY, Degree, Control = Major, n_ctrl = n, mean_ctrl = mean, met_contrl = met)
+  lres[[i]] <- left_join(z1, z2, by = c("AY", "Degree"))
+}
+out_program <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
+```
+
+### Core Level Assessment
+Business Core assessment for each majors. First, result rows relevant. This will contain results for all business majors or MBA and by major/specialization. Then, separate the outcomes by all the business majors or MBA. Finally, 'glue' them to relevant rows (identified by degree and course/topic).
+
+```{r}
+# Now use just core objectives
+core_map <- asm_map %>% filter(core)
+program_map <- asm_map %>% filter(!core)
+
+# Retrieve, edit, and add
+# For program level (list)
+# Number of programs x Number of Program LOs (each)
+# For core level (matrix)
+# Number of programs x Number of Core LOs
+
+# Extract data by identifiers: degree, major (who took it), course (topic)
+
+# For each core lo, obtain for all programs
+# Input of data, lo, and program... Enough?
+# Function to retrieve data manually
+# Then function to pull the selectors from the mapping
+
+extract_ext <- function(degree, course, main_group, comp_group, lo, prg){
+  tmp1 <- tbl_all %>%
+    filter(Degree == degree, Major == main_group, Course == course) %>%
+    select(AY, Degree, Course, US,
+           main_group = Major, main_n = n, main_mean = mean, main_met = met) %>% 
+    mutate(Program = prg, PLO = lo)
+  tmp2 <- tbl_all %>%
+    filter(Degree == degree, Major == comp_group, Course == course) %>%
+    select(AY, Degree, Course,
+           comp_group = Major, comp_n = n, comp_mean = mean, comp_met = met)
+  left_join(tmp1, tmp2, by = c("AY", "Degree", "Course"))
+  
+}
+
+# Program map
+lres <- mapply(extract_ext, lo = program_map$plo, degree = program_map$degree, course = program_map$external_tool, main_group = program_map$external_group, comp_group = program_map$external_control_group, prg = program_map$program, SIMPLIFY = FALSE)
+
+out <- bind_rows(lres)
+
+write_csv(out, "out/ext-prog-assessment.csv")
+```
+
+
+```{r}
+lprograms <- levels(factor(program_map$external_group))
+
+extract_ext_core <- function(prog){
+  out_list <- mapply(extract_ext, lo = core_map$plo, degree = core_map$degree, course = core_map$external_tool, main_group = prog, comp_group = core_map$external_control_group, prg = core_map$program, SIMPLIFY = FALSE)
+  out_core <- bind_rows(out_list) %>% arrange(Program, PLO, AY)
+  out_core
+  
+}
+
+lres <- sapply(lprograms, extract_ext_core, simplify = FALSE, USE.NAMES = TRUE)
+out <- bind_rows(lres)
+
+# What about LO x Target? Simplify to outer(X, Y, FUN = this)?
+# LO >> All the argument for extract_ext except for target group?
+write_csv(out, "out/ext-core-assessment.csv")
+```
+

@@ -1,49 +1,37 @@
----
-title: "Note to Update External Direct 03"
-output: html_notebook
----
+# Report the internal direct assessment outcomes for AY2019, using the rubric
+# outcome data and identification information from the survey responses.
+# Note that this is only for the *summative* assessment.
 
-```{r setup, echo=FALSE, include=FALSE}
-# knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+# Set up
 library(tidyverse)
 options(dplyr.summarise.inform=FALSE) 
 library(readxl)
-library(gridExtra)
-library(knitr)
 library(lubridate)
 datapath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
-```
 
-```{r load}
-asm_map <- read_excel(paste0(datapath, "Assessment Data Main.xlsx"), "Mapping")
-```
+# Import the new database and mapping
+sns <- c("prg", "core", "mba")
+mns <- paste0("map_", sns)
+ldf <- sapply(sns, function(x) read_excel(paste0(datapath, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
+lmp <- sapply(mns, function(x) read_excel(paste0(datapath, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
 
-Individual Peregrine to Summary
---------------------------------------------------------------------------------
-Import individual data and benchmark scores.
-```{r}
+# Import score data
 fn <- "External Direct Comparison//IndividualResults_UND.xlsx"
 tmp1 <- read_excel(paste0(datapath, fn), sheet = 2, skip = 5)
 fn <- "External Direct Comparison//IndividualResults_MBA.xlsx"
 tmp2 <- read_excel(paste0(datapath, fn), sheet = 2, skip = 5)
 tmp3 <- bind_rows(tmp1, tmp2)
 names(tmp3)[1] <- "ID"
-
 mdf <- tmp3 %>% select(-(Learner:`Student ID`)) # Remove private information
-
 rm(list = ls(pattern = "tmp?"))
-```
 
-
-```{r}
+# Import benchmark scores
 fn <- "External Direct Comparison//External Direct Comparison.xlsx"
 ref <- read_excel(paste0(datapath, fn), "Both")
 names(ref) <- c("Course", "Timeline", "Score", "ACBSP_US", "ACBSP_R2", "US",
                 "MSCHE", "Public", "Degree")
-```
 
-Create variables, reshape data set, and merge benchmark score data.
-```{r}
+# Create variables, reshape data set, and merge benchmark score data. ----------
 mdf <- mdf %>%
   mutate(
     Time = ymd_hms(Completed),
@@ -75,14 +63,12 @@ lmdf <- lmdf %>%
 
 # Name has changed 2019 for *General Business* to *ISBC* (along with the program
 # change). Count them together.
+genbus <- "(General Business)|(Integrated Global Business)|(Interdisciplinary Studies in Business and Commerce)"
 lmdf <- lmdf %>%
-  mutate(Major = str_replace(Major,"Interdisciplinary Studies in Business and Commerce", "General Business"),
+  mutate(Major = str_replace(Major, genbus, "ISBC"),
          Degree = str_replace(Degree, "BS", "UND"))
 
-```
-
-Aggregate by different level (all business major, by major, by specialization).
-```{r}
+# Aggregate ----
 # Aggregate: All students
 tbl1 <- lmdf %>% group_by(Degree, AY, Course) %>% 
   summarise(mean = mean(Score, na.rm = TRUE)/100,
@@ -116,105 +102,101 @@ tbl_all <- tbl_all %>%
   left_join(ref %>% select(Degree, Course, US),
             by = c("Degree", "Course")) %>% 
   mutate(US = US/100)
-```
 
+# Select program ----
+map2 <- lmp$map_prg %>% filter(source == "External")
 
-```{r}
-dim(tbl_all)
-summary(tbl_all)
-```
-
-
-Outcome Table
---------------------------------------------------------------------------------
-
-### Program Level Assessment
-Using the mapping, extract relevant information.
-```{r}
 # Extract relevant rows from the outcome summary
 # while adding the identification information
 lres <- list()
-for(i in c(1:nrow(asm_map))){
-  # Selectors
-  course <- asm_map[[i, "external_tool"]]
-  degree <- asm_map[[i, "degree"]]
-  major <- asm_map[[i, "external_group"]]
-  control <- asm_map[[i, "external_control_group"]]
-  # Identifier
-  program <- asm_map[[i, "program"]]
-  plo <- asm_map[[i, "plo"]]
-  # Populate the list by extracting
+for(i in 1:nrow(map2)){
+  x <- map2[i, ]
   z1 <- tbl_all %>%
-    filter(Degree == degree, Major == major, Course == course) %>%
+    filter(Degree == "UND", Major == x$group2, Course == x$tool) %>%
     select(AY, Degree, Major, Course, n, mean, met, US) %>% 
-    mutate(Program = program, PLO = plo)
+    mutate(Program = x$program, PLO = x$plo)
   z2 <- tbl_all %>%
-    filter(Degree == degree, Major == control, Course == course) %>%
+    filter(Degree == "UND", Major == x$external_control_group, Course == x$tool) %>%
     select(AY, Degree, Control = Major, n_ctrl = n, mean_ctrl = mean, met_contrl = met)
   lres[[i]] <- left_join(z1, z2, by = c("AY", "Degree"))
 }
 out_program <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
-```
 
-### Core Level Assessment
-Business Core assessment for each majors. First, result rows relevant. This will contain results for all business majors or MBA and by major/specialization. Then, separate the outcomes by all the business majors or MBA. Finally, 'glue' them to relevant rows (identified by degree and course/topic).
+write_csv(out_program, "out/prg_external.csv")
 
-```{r}
-# Now use just core objectives
-core_map <- asm_map %>% filter(core)
-program_map <- asm_map %>% filter(!core)
 
-# Retrieve, edit, and add
-# For program level (list)
-# Number of programs x Number of Program LOs (each)
-# For core level (matrix)
-# Number of programs x Number of Core LOs
+# Select core ----
+map3 <- lmp$map_core %>% filter(group1 == "CPC")
 
-# Extract data by identifiers: degree, major (who took it), course (topic)
-
-# For each core lo, obtain for all programs
-# Input of data, lo, and program... Enough?
-# Function to retrieve data manually
-# Then function to pull the selectors from the mapping
-
-extract_ext <- function(degree, course, main_group, comp_group, lo, prg){
-  tmp1 <- tbl_all %>%
-    filter(Degree == degree, Major == main_group, Course == course) %>%
-    select(AY, Degree, Course, US,
-           main_group = Major, main_n = n, main_mean = mean, main_met = met) %>% 
-    mutate(Program = prg, PLO = lo)
-  tmp2 <- tbl_all %>%
-    filter(Degree == degree, Major == comp_group, Course == course) %>%
-    select(AY, Degree, Course,
-           comp_group = Major, comp_n = n, comp_mean = mean, comp_met = met)
-  left_join(tmp1, tmp2, by = c("AY", "Degree", "Course"))
-  
+# Extract relevant rows from the outcome summary
+# while adding the identification information
+lres <- list()
+for(i in 1:nrow(map3)){
+  x <- map3[i, ]
+  dfx <- tbl_all %>% filter(Degree == "UND", Major == x$group2, Course == x$tool)
+  lres[[i]] <- dfx %>% select(AY, Degree, Major, Course, n, mean, met, US) %>% 
+    mutate(Program = x$program, PLO = x$plo, Source = x$source)
 }
+out_core <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
 
-# Program map
-lres <- mapply(extract_ext, lo = program_map$plo, degree = program_map$degree, course = program_map$external_tool, main_group = program_map$external_group, comp_group = program_map$external_control_group, prg = program_map$program, SIMPLIFY = FALSE)
-
-out <- bind_rows(lres)
-
-write_csv(out, "out/ext-prog-assessment.csv")
-```
-
-
-```{r}
-lprograms <- levels(factor(program_map$external_group))
-
-extract_ext_core <- function(prog){
-  out_list <- mapply(extract_ext, lo = core_map$plo, degree = core_map$degree, course = core_map$external_tool, main_group = prog, comp_group = core_map$external_control_group, prg = core_map$program, SIMPLIFY = FALSE)
-  out_core <- bind_rows(out_list) %>% arrange(Program, PLO, AY)
-  out_core
-  
+# Filter out
+lres <- list()
+lmaj <- levels(factor(tbl_all$Major))
+k <- 0
+for(i in 1:nrow(map3)){
+  x <- map3[i, ]
+  for(j in 1:length(lmaj)){
+    y <- lmaj[j]
+    k <- k + 1
+    # print(c(i, j, k))
+    dfx <- tbl_all %>% filter(Degree == "UND", Major == y, Course == x$tool)
+    lres[[k]] <- dfx %>% select(AY, Degree, Major, Course, n, mean, met, US) %>%
+      mutate(Program = x$program, PLO = x$plo, Source = x$source)
+  }
 }
+out_core_dis <- bind_rows(lres)
 
-lres <- sapply(lprograms, extract_ext_core, simplify = FALSE, USE.NAMES = TRUE)
-out <- bind_rows(lres)
 
-# What about LO x Target? Simplify to outer(X, Y, FUN = this)?
-# LO >> All the argument for extract_ext except for target group?
-write_csv(out, "out/ext-core-assessment.csv")
-```
+core_dis <- pivot_wider(out_core_dis, id_cols = c(AY, PLO, Source), names_from = Major, values_from = c(mean, met, n))
+out_core_full <- out_core %>% left_join(core_dis, by = c("AY", "PLO", "Source")) %>% arrange(Source, PLO, AY) %>% relocate(Source, PLO, AY)
 
+write_csv(out_core_full, "out/core_external.csv")
+
+
+# Select MBA ----
+map4 <- lmp$map_mba %>% filter(group1 == "CPC")
+# Extract relevant rows from the outcome summary
+# while adding the identification information
+lres <- list()
+for(i in 1:nrow(map4)){
+  x <- map4[i, ]
+  dfx <- tbl_all %>% filter(Degree == "MBA", Major == x$group2, Course == x$tool)
+  lres[[i]] <- dfx %>% select(AY, Degree, Major, Course, n, mean, met, US) %>% 
+    mutate(Program = x$program, PLO = x$plo, Source = x$source)
+}
+out_core <- bind_rows(lres) %>% arrange(Program, PLO, Major, AY)
+
+lres <- list()
+lmaj <- levels(factor(tbl_all$Specialization))
+k <- 0
+for(i in 1:nrow(map4)){
+  x <- map4[i, ]
+  for(j in 1:length(lmaj)){
+    y <- lmaj[j]
+    k <- k + 1
+    dfx <- tbl_all %>% filter(Degree == "MBA", Specialization == y, Course == x$tool)
+    lres[[k]] <- dfx %>% select(AY, Degree, Specialization, Course, n, mean, met, US) %>%
+      mutate(Program = x$program, PLO = x$plo, Source = x$source)
+  }
+}
+out_core_dis <- bind_rows(lres)
+
+core_dis <- pivot_wider(out_core_dis, id_cols = c(AY, PLO, Source), names_from = Specialization, values_from = c(mean, met, n))
+out_core_full <- out_core %>% left_join(core_dis, by = c("AY", "PLO", "Source"))  %>% arrange(Source, PLO, AY) %>% relocate(Source, PLO, AY)
+out_core_full
+
+write_csv(out_core_full, "out/mba_external.csv")
+
+# Still need improvements though.
+# - MBA lacking 2016
+# - Column names? (See the resulting sheets and find improvements)

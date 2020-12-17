@@ -12,3 +12,9 @@ output: html_document
 
 - Finished up the annual report with the exported graphs using a [new note](note_annual-reports-03.html).
 
+# 12/16/2020
+
+Wrap up the notes. I wrote casually here and there, having had some troubles re-collecting them... In the Annual Report notebook 02 I gathered and organized them. In the notebook 03, I made report outputs from the database.
+
+1. Extract the code for data handling into independent R scripts.
+2. Format the report notes into a report document.

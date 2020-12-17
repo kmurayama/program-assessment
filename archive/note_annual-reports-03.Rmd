@@ -1,6 +1,9 @@
 ---
 title: "Note 03 for annual reports"
-output: html_notebook
+date: "11/27/2020"
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, echo=FALSE, include=FALSE}
