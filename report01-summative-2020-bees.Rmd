@@ -1,0 +1,92 @@
+---
+title: "Report 01 Summative Assessments 2020 for BEES"
+author: "Kentaro Murayama"
+date: "12/19/2020"
+output: html_document
+---
+
+```{r setup, echo=FALSE, include=FALSE}
+# knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = FALSE)
+library(tidyverse)
+options(dplyr.summarise.inform=FALSE) 
+library(readxl)
+library(gridExtra)
+library(knitr)
+library(lubridate)
+root <- "C:\\Users\\kentr\\California University of Pennsylvania\\"
+datadir <- "ACBSP data reporting - Documents\\Data\\"
+datapath <- paste0(root, datadir)
+```
+
+# Introduction
+
+Summative assessments are summarized in this document.
+All the values for assessment outcomes are stored in an Excel file.
+Scripts to create new values are stored in this project under `R` directory.
+
+# Data
+
+Load data from sheets.
+One list for the values and the other for mappings.
+
+```{r load}
+# File names and worksheet names
+fn <- paste0(datapath, "Assessment Data Main.xlsx")
+sns <- c("prg", "core", "mba")
+mns <- paste0("map_", sns)
+
+# Load data and mappings into lists
+ldf <- sapply(sns, function(x) read_excel(fn, x),
+              simplify = FALSE, USE.NAMES = TRUE)
+lmp <- sapply(mns, function(x) read_excel(fn, x),
+              simplify = FALSE, USE.NAMES = TRUE)
+```
+
+Data is stored in a simple two-way (flat) table. Visualization can be done in Excel easily.
+
+```{r}
+sapply(ldf, names)
+```
+
+
+# Summary Visualization
+
+```{r}
+draw_time <- function(sn, i, y1 = "main", y2 = NULL){
+  # Pick a row from mapping
+  x <- lmp[[paste("map", sn, sep = "_")]][i, ]
+  # Using the information, pick relevant data and comparison if any
+  y <- ldf[[sn]] %>% filter(plo == x$plo, type == x$type, source == x$source)
+  if(!is.null(y2)){
+    y <- y %>% select(plo, type, source, ay, starts_with(c(y1, y2)))
+  }
+  # Reshape with main/comparison distinctions in outcome
+  z <- pivot_longer(y, cols = ends_with("outcome"),
+                    names_to = "Type", values_to = "Outcome")
+  
+  p <- ggplot(z, aes(ay, Outcome, group = Type)) +
+    geom_line(aes(linetype = Type), na.rm = TRUE) +
+    geom_point(size = 2, na.rm = TRUE) +
+    scale_y_continuous(labels=scales::percent_format(accuracy = 5L)) 
+  # Using the map (x), add the target level
+  p <- p + geom_hline(aes(yintercept = x$target), alpha = 0.4, color = "red")
+  
+  ttl <- paste(x$plo, x$type, x$source)
+  subt <- paste0("Assessment Tool: ", x$tool_description)
+  p + labs(title = ttl, subtitle = subt) +
+    xlab("Academic Year\nSample Size") +
+    ggthemes::theme_fivethirtyeight(base_size = 7) +
+    theme(legend.position = "right", legend.direction = "vertical")
+}
+
+# Test
+# draw_time("prg", 1)
+# draw_time("prg", 25, y2 = "all")
+# draw_time("core", 1)
+# draw_time("core", 1, y2 = "acc")
+# draw_time("core", 1, y2 = c("acc", "eco"))
+# draw_time("mba", 1)
+# draw_time("mba", 1, y2 = "ba")
+```
+
+
