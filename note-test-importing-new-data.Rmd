@@ -1,0 +1,383 @@
+---
+title: "Test Importing New Data Format"
+output:
+  word_document: default
+  html_notebook: default
+  pdf_document: default
+---
+
+# Introduction
+
+Due to the computer crush, I lost the recent notes on importing the new data format. Let's go over this again. Jon tested the new D2L data format with me and came up with a reasonably good solution. The item at hand should have all the necessary information.
+
+Fist, I need to verify the data are here.
+Then, I need to clean the data.
+Third, the data will be stored in a database, so that others can use it without going through the cleaning process.
+Fourth, make a set of reports, using the scripts from the last iteration.
+
+# Import Data
+
+```{r}
+library(tidyverse)
+library(readxl)
+rootpath <- "C:\\Users\\HP\\California University of Pennsylvania\\"
+datapath <- paste0(rootpath, "ACBSP data reporting - Documents\\Data\\")
+path <- paste0(datapath, "Internal Direct Assessment\\")
+fn <- "Rubrics_07302021.xlsx"
+rubrics <- read_xlsx(paste0(path, fn), "rubrics")
+  # mutate(across(c(RubricId:Name, LevelAchieved), factor),
+  #        IsScoreOverridden = (IsScoreOverridden == "True"))
+survey <- read_xlsx(paste0(path, fn), "survey")
+```
+
+
+Check the data:
+
+```{r}
+head(rubrics)
+names(rubrics)
+```
+
+```{r}
+head(survey)
+names(survey)
+survey
+```
+
+I'll standardize the survey this summer, so that those are all standardized. Anyway, let's worry about it later. Next, clean the rubrics data.
+
+# Clean Data
+## First Impression
+
+```{r assignment-names}
+# table(rubrics$Name)
+levels(factor(rubrics$Name))
+```
+
+```{r}
+# table(rubrics$`Rubric Object Criteria 6-Name`)
+levels(factor(rubrics$`Rubric Object Criteria 6-Name`))
+```
+
+```{r}
+# table(rubrics$`Rubric Object Levels 6-Name`)
+levels(factor(rubrics$`Rubric Object Levels 6-Name`))
+```
+
+As expected, it's quite a mess. Let's figure out priorities.
+
+1. Standardize the assessment names, following the plan. Refer to the Excel sheet and convert them.
+2. Drop the non-assessment courses and assignments.
+3. Standardize the achievement levels. This should be easy with the existing script.
+
+Alternatively, I can merge the survey using the keys and filter. Then, I can do steps 1 and 2.
+
+## Merge and Filter
+
+```{r}
+mdf <- survey %>% select(ID, Exclude, Email, Name, Semester, "Course and Section", "Assignment Names", "URL")
+
+x <- head(mdf$URL)
+str_extract(x, "rubricId\\=\\d+")
+str_extract(x, "ou\\=\\d+")
+str_match(x, "(ou\\=)(\\d+)")
+```
+
+```{r}
+rubricId <- str_match(mdf$URL, "(rubricId\\=)(\\d+)")[, 3]
+ou <- str_match(mdf$URL, "(ou\\=)(\\d+)")[, 3]
+
+mdf <- bind_cols(mdf, RubricId = rubricId, ou = ou)
+mdf <- mdf %>% mutate(RubricId = as.numeric(RubricId))
+
+survey.backup <- mdf
+```
+
+```{r}
+head(mdf)
+```
+
+Now merge.
+
+```{r}
+levels(factor(rubrics$RubricId))
+```
+
+```{r}
+levels(factor(mdf$RubricId))
+```
+
+```{r}
+rubrics <- left_join(rubrics, mdf, by = "RubricId", suffix = c(".rub", ".suv"))
+# with(rubrics, table(RubricId, Code))
+head(rubrics)
+```
+
+
+```{r}
+levels(factor(rubrics$`Assignment Names`))
+```
+
+Just realized a mistake. I need to also connect to the learning objectives, using the search key in the main database. That may take a while...
+Also, I can't filter out based on the survey. Those are all requested.
+
+Anyway, the first step is the same. Let's clean up the assignment names.
+
+## Clean Assignment Names
+
+```{r}
+courses <- str_split(rubrics$`Course and Section`, "-", simplify = TRUE)
+rubrics <- bind_cols(rubrics, Course = courses[, 1], Section = courses[, 2])
+
+rubrics %>% filter(Course == "BUS499")
+(clevels <- levels(factor(rubrics$Course)))
+```
+
+18 courses to go through.
+
+This is something that can be simplified/standardized in the survey. For this iteration, let's just edit manually. Sort the data by course. Standardize names.
+
+
+```{r}
+x <- rubrics %>% filter(Course == "BUS345")
+levels(factor(x$`Assignment Names`))
+```
+
+
+```{r}
+x <- rubrics %>% filter(Course == "BUS499")
+levels(factor(x$`Assignment Names`))
+```
+
+```{r}
+x <- rubrics %>% filter(Course == "FIN301")
+levels(factor(x$`Assignment Names`))
+```
+
+Why do we have 301? And this name conflict again.
+
+
+```{r}
+x <- rubrics %>% filter(Course == "HRM400")
+levels(factor(x$`Assignment Names`))
+```
+
+
+```{r}
+x <- rubrics %>% filter(Course == "MBA700")
+levels(factor(x$`Assignment Names`))
+```
+```{r}
+x <- rubrics %>% filter(Course == "MKT300")
+levels(factor(x$`Assignment Names`))
+```
+
+Now, reload and examine.
+
+Clean enough.
+
+## Achievement Levels
+
+Next, clean achievement levels. Apply this part to the rubric data directly later and save as the source data. This way, I can have clean survey and clean rubric.
+
+
+```{r}
+head(rubrics)
+clevels
+```
+
+
+```{r}
+mdf <- rubrics %>% select(Course, Section, Semester, Assignment = `Assignment Names`, Criteria = `Rubric Object Criteria 6-Name`)
+head(mdf)
+```
+
+```{r}
+sdf <- mdf %>% filter(Course == "ACC441")
+head(sdf)
+levels(factor(sdf$Criteria))
+```
+
+No rubric provided last time.
+Other ones are exams.
+
+```{r}
+sdf <- mdf %>% filter(Course == "ECO421")
+head(sdf)
+levels(factor(sdf$Criteria))
+
+```
+
+- All rows.
+- Lit review.
+- Discussion.
+
+Same keys.
+
+
+
+```{r}
+sdf <- mdf %>% filter(Course == "FIN302")
+head(sdf)
+levels(factor(sdf$Criteria))
+```
+
+No rubric last time.
+
+
+```{r}
+sdf <- mdf %>% filter(Course == "HRM400")
+levels(factor(sdf$Assignment))
+```
+
+
+```{r}
+tdf <- sdf %>% filter(Assignment == "Final Project Proposal")
+levels(factor(tdf$Criteria))
+tdf <- sdf %>% filter(Assignment == "Simulation Paper 1")
+levels(factor(tdf$Criteria))
+levels(factor(tdf$Semester))
+levels(factor(tdf$Section))
+tdf <- sdf %>% filter(Assignment == "Simulation Paper 2")
+levels(factor(tdf$Criteria))
+levels(factor(tdf$Semester))
+levels(factor(tdf$Section))
+tdf <- sdf %>% filter(Assignment == "Simulation Paper 3")
+levels(factor(tdf$Criteria))
+levels(factor(tdf$Semester))
+levels(factor(tdf$Section))
+```
+
+No need for consolidation.
+
+
+
+```{r}
+sdf <- mdf %>% filter(Course == "BUS345")
+levels(factor(sdf$Assignment))
+# levels(factor(sdf$Criteria))
+```
+
+
+```{r}
+tdf <- sdf %>% filter(Assignment == "Annotated Bibliography")
+levels(factor(tdf$Criteria))
+```
+
+Use keys.
+
+```{r}
+tdf <- sdf %>% filter(Assignment == "Ethics Final Paper")
+levels(factor(tdf$Criteria))
+```
+
+
+```{r}
+sdf <- mdf %>% filter(Course == "MKT401")
+levels(factor(sdf$Assignment))
+levels(factor(sdf$Criteria))
+```
+
+Such a mess, but use the same keys.
+
+
+
+No use. Let's use the existing keys to produce outputs and see issues later.
+
+## Duplicates
+
+```{r}
+names(survey.backup)
+table(survey.backup$RubricId)
+```
+
+Check survey. Flag.
+
+```{r}
+survey.backup %>% filter(RubricId == 138337)
+```
+
+```{r}
+survey.backup %>% filter(RubricId == 138340)
+```
+
+```{r}
+survey.backup %>% filter(RubricId == 138341)
+```
+
+```{r}
+survey.backup %>% filter(RubricId == 138343)
+```
+```{r}
+survey.backup %>% filter(RubricId == 138344)
+```
+
+```{r}
+survey.backup %>% filter(RubricId == 149547 )
+```
+Problem. Two different assignments.
+MGT300-GW1	Hidden Figures Paper 
+MGT300-GW1	Power and Influence AAR
+
+```{r}
+survey.backup %>% filter(RubricId == 155080)
+```
+```{r}
+survey.backup %>% filter(RubricId == 155081)
+```
+```{r}
+survey.backup %>% filter(RubricId == 160156)
+```
+
+```{r}
+survey.backup %>% filter(RubricId == 163227)
+```
+```{r}
+survey.backup %>% filter(RubricId == 169074)
+```
+
+This one is problematic. Supposed to be different assignment, but duplicated.
+
+FIN301-GW1	Moral Hazard 
+FIN301-GW1	RIch Uncle
+
+```{r}
+survey.backup %>% filter(RubricId == 171642)
+```
+
+Now, check.
+
+```{r}
+test <- survey.backup %>% filter(is.na(Exclude))
+table(test$RubricId)
+plot(table(test$RubricId))
+```
+
+
+```{r}
+survey.backup %>% filter(RubricId == 164867)
+```
+```{r}
+survey.backup %>% filter(RubricId == 148858)
+```
+
+```{r}
+survey.backup %>% filter(RubricId == 180495)
+```
+
+Supposed to be different.
+BUS242-GW1	Second Paper and presentation
+BUS242-GW1	Second Paper and presentation
+
+
+Check again. Done.
+
+# Next
+
+The data should be fairly clean.
+
+- Compile data using keys. Check for errors.
+- Ask for the correct URLs for the duplicates. No rush at this point.
+- Ask for Exam data. This is urgent.
+
+Archive this document and move on.
