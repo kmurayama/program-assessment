@@ -1,0 +1,333 @@
+---
+title: "Process new data"
+output: html_notebook
+---
+
+# Introduction
+
+In order to check the lack of data, go over each program. At this point, automation is not necessary. Theoretically, I should be able to re-use the codes from last year, but that's not necessary at this point.
+
+# Data
+
+Import the rubric data and survey.
+
+```{r}
+library(tidyverse)
+library(readxl)
+rootpath <- "C:\\Users\\HP\\California University of Pennsylvania\\"
+datapath <- paste0(rootpath, "ACBSP data reporting - Documents\\Data\\")
+path <- paste0(datapath, "Internal Direct Assessment\\")
+fn <- "Rubrics_07302021.xlsx"
+rubrics <- read_xlsx(paste0(path, fn), "rubrics")
+#
+survey <- read_xlsx(paste0(path, fn), "survey")
+plans <- read_xlsx(paste0(path, fn), "plans")
+#
+rubrics <- read_xlsx(paste0(path, fn), "rubrics")
+```
+
+
+```{r}
+# ncol(survey) == 22
+colnames(survey) <- c("ID", "Exclude", "Start", "Completion", "Email", "Survey Name", "Semester", "Course and Section Original", "Course and Section", "Assessment Name Original", "Assessment Name", "Rubric Grade Original", "Rubric Grade", "URL Original", "URL", "Analysis Rubric", "Action Rubric", "LO", "n", "s", "Analysis Non Rubric", "Action Non Rubric")
+survey <- survey %>% mutate(across(c(n, s), as.numeric))
+```
+
+```{r}
+# Extract ID's from URL
+x <- str_match(survey$URL, "(rubricId\\=)(\\d+)")[, 3]
+y <- str_match(survey$URL, "(ou\\=)(\\d+)")[, 3]
+survey <- bind_cols(survey, RubricId = as.numeric(x), ou = as.numeric(y))
+# Split course and section
+courses <- str_split(survey$`Course and Section`, "-", simplify = TRUE)
+survey <- bind_cols(survey, Course = courses[, 1], Section = courses[, 2])
+
+# Split survey
+survey.r <- survey %>% filter(`Rubric Grade` == "Yes")
+survey.n <- survey %>% filter(`Rubric Grade` == "No")
+# Record course IDs
+clevels.r <- levels(factor(survey.r$Course))
+clevels.n <- levels(factor(survey.n$Course))
+rm(x, y, courses)
+```
+
+Merge them, but in ad hoc way for now.
+
+```{r}
+rubrics <- left_join(rubrics, survey.r, by = "RubricId", suffix = c(".rub", ".suv"))
+clevels.plan <- levels(factor(plans$Course))
+```
+
+Now, add another data from the main database. I need keys to extract certain criteria from the rubric.
+
+```{r}
+path <- datapath
+fn <- "Assessment Data Main.xlsx"
+sh <- c("prg", "core", "mba", "map_prg", "map_core", "map_mba")
+maindf <- sapply(sh, function(x) read_xlsx(paste0(path, fn), sheet = x), USE.NAMES = TRUE)
+```
+
+
+# Examine
+
+Automation is nice, but it may take longer in the end due to many exceptions. Go over each program.
+
+## ACC
+
+```{r}
+maindf$map_prg %>% filter(program == "Accounting" & source == "Internal") %>% select(plo_id, group2, tool, internal_rubric_keys2019)
+```
+
+```{r}
+survey.n %>% filter(Course == "ACC331")
+```
+
+```{r}
+survey.n %>% filter(Course == "ACC318")
+```
+
+```{r}
+rubrics %>% filter(Course == "ACC441")
+```
+
+For ACC441, I need rubric keys. For now, overall grades can be aggregated.
+
+
+## Emes(CO
+
+```{r}
+maindf$map_prg %>% filter(program == "Economics" & source == "Internal") %>% select(plo_id, group2, tool, internal_rubric_keys2019)
+```
+
+```{r}
+survey.n %>% filter(Course == "ECO301")
+```
+
+```{r}
+survey.n %>% filter(Course == "ECO302")
+```
+
+Not offered? No.
+
+```{r}
+clevels.plan
+```
+
+```{r}
+rubrics %>% filter(Course == "ECO421")
+```
+
+```{r}
+rubrics %>% filter(Course == "ECO421") %>% select(starts_with("Rubric Object")) 
+```
+
+Keys found.
+
+
+## FIN
+
+```{r}
+maindf$map_prg %>% filter(program == "Finance" & source == "Internal") %>% select(plo_id, group2, tool, internal_rubric_keys2019)
+```
+
+```{r}
+rubrics %>% filter(Course == "FIN302")
+```
+
+
+## HRM
+
+```{r}
+maindf$map_prg %>% filter(program == "Human Resources Management" & source == "Internal") %>% select(plo_id, group2, tool, internal_rubric_keys2019)
+```
+
+```{r}
+rubrics %>% filter(Course == "HRM400")
+```
+
+```{r}
+x <- rubrics %>% filter(Course == "HRM400") %>% select(starts_with("Rubric Object")) %>% pull("Rubric Object Criteria 6-Name")
+levels(factor(x))
+```
+
+## MGT
+
+```{r}
+maindf$map_prg %>% filter(program == "Management" & source == "Internal") %>% select(plo_id, group2, tool, internal_rubric_keys2019)
+```
+
+```{r}
+survey.n %>% filter(Course == "BUS345")
+```
+
+Experimental projects?
+
+```{r}
+rubrics %>% filter(Course == "BUS345")
+```
+
+Regular ones are in rubric.
+
+
+## MKT
+
+```{r}
+maindf$map_prg %>% filter(program == "Marketing" & source == "Internal") %>% select(plo_id, group2, tool, internal_rubric_keys2019)
+```
+
+```{r}
+rubrics %>% filter(Course == "MKT401")
+```
+
+## Core
+```{r}
+maindf$map_core %>% filter(source == "Internal") %>% select(plo, group2, tool, internal_rubric_keys2019)
+```
+
+```{r}
+rubrics %>% filter(Course == "BUS499")
+```
+
+## MBA
+
+```{r}
+maindf$map_mba %>% filter(type == "Summative", source == "Internal") %>% select(plo, group2, tool, internal_rubric_keys2019)
+```
+
+# Process
+
+For the ones with keys, I can just use them to extract rows. For the ones with all the rows, I need to be more careful with the non-grade rows such as attributions.
+
+Following the procedure last year, I can filter out attribute measures, define "Met" variable, summarize over groups, and pull the results.
+
+
+I wonder if it's more robust to pull the relevant sub-samples and compute, however. I'll need to go back and check data integrity anyway... Also, is it a good idea to combine rubric/non-rubric together? For the report, I'll need to do that, but it can be done differently along the way. Then aggregation should be come at the end.
+Moreover, the issue of strict reconciliation was serious because of this early aggregation. If PLOs correspondence are extracted, then the wording of rubric criteria should matter less.
+
+Let's give it a try.
+
+## Case: MGT
+
+```{r}
+maindf$map_prg %>% filter(program == "Management" & source == "Internal") %>% select(plo_id, group2, tool, internal_rubric_keys2019)
+```
+
+### Non Rubric
+
+```{r}
+survey.n %>% filter(Course == "BUS345")
+```
+
+First, extract cases, then filter by keys.
+```{r}
+# # Function test for general proc
+# x <- survey.n %>% filter(Course == "BUS345")
+# x %>% filter(grepl("LO", LO)) %>% summarise(across(c(n, s), ~ sum(.x, na.rm = TRUE)))
+# Actual compuattio
+x <- survey.n %>% filter(Course == "BUS345")
+x %>% filter(grepl("LO1", LO)) %>% summarise(across(c(n, s), ~ sum(.x, na.rm = TRUE))) %>% mutate(Met = s/n)
+x %>% filter(grepl("LO2", LO)) %>% summarise(across(c(n, s), ~ sum(.x, na.rm = TRUE))) %>% mutate(met = s/n)
+```
+
+### Rubric
+
+```{r}
+x <- rubrics %>% filter(Course == "BUS345")
+x1 <- x %>% filter(grepl("LO1", `Rubric Object Criteria 6-Name`))
+x1 <- x1 %>% select(!LO:`Action Non Rubric`) # Remove non-rubric data
+
+names(x1)
+head(x1)
+hist(x1$`Rubric Assessment Criteria 6-Score`)
+levels(factor(x1$`Course and Section`))
+levels(factor(x1$`Rubric Object Levels 6-Name`))
+```
+
+Needs some consolidation of levels. Across courses? I can just look at the score and label them later.
+
+```{r}
+levels(factor(rubrics$`Rubric Object Levels 6-Name`))
+```
+
+```{r}
+table(x1$`Rubric Assessment Criteria 6-Score`)
+x1 %>% filter(`Rubric Assessment Criteria 6-Score` == 1)
+table(x1$`Rubric Object Levels 6-Name`)
+```
+
+Wait. Then, the step of creating Met is not generalizable. Need to have it consolidated first.
+I can separate this step to make a "clean" data file later.
+
+Try one by one.
+[1] "Basic 75%"       "Excellent 100%"  "Good 85%"       
+[4] "Rudimentary 65%" "Unacceptable 0%"
+
+```{r}
+# patterns <- c(
+#   "^Basic" = "Basic",
+#   "^Excellent" = "Excellent",
+#   "^Good" = "Good",
+#   "^Rudimentary" = "Rudimentary",
+#   "^Unacceptable" = "Unacceptable"
+# )
+# str_replace_all(x1$`Rubric Object Levels 6-Name`, patterns)
+
+x1 <- x1 %>% mutate(LevelAchieved = str_replace_all(`Rubric Object Levels 6-Name`, "\\s\\d+\\%", ""),
+  Met = case_when(
+    is.na(LevelAchieved) ~ "Missing",
+    LevelAchieved == "Excellent" | LevelAchieved == "Good" | LevelAchieved == "Basic" ~ "Met",
+    LevelAchieved == "Rudimentary" | LevelAchieved == "Unacceptable" ~ "Not",
+    TRUE ~ "Other"))
+table(x1$Met)
+```
+
+As an output, I want a row that matches with the main data base.
+
+`program, plo, type, source, ay, main_n, main_outcome`
+
+
+```{r}
+y1 <- maindf$map_prg %>% filter(plo == "MGT 1", type == "Summative", source == "Internal")
+```
+
+It would be easier if I just column bind after trimming.
+
+(Meanhile, another issue is that I want to attach the attributes. This would be easier to do at the top level rather than for each class.)
+
+Now, I can count students with n_distinct.
+
+```{r}
+x1 %>% summarise(N = n_distinct(UserId), Met = mean((Met == "Met"), na.rm = TRUE))
+```
+
+So, by extracting the proc, I have the following.
+
+```{r}
+y <- maindf$map_prg %>% filter(plo == "MGT 1", type == "Summative", source == "Internal")
+course <- str_replace_all(y$group2, fixed(" "), "")
+# key <- y$internal_rubric_keys2019
+key <- "LO1"
+ay <- 2020
+
+x <- rubrics %>% filter(Course == course) %>%
+  filter(grepl(key, `Rubric Object Criteria 6-Name`)) %>% 
+  select(!LO:`Action Non Rubric`) %>%
+  mutate(LevelAchieved = str_replace_all(`Rubric Object Levels 6-Name`, "\\s\\d+\\%", ""),
+  Met = case_when(
+    is.na(LevelAchieved) ~ "Missing",
+    LevelAchieved == "Excellent" | LevelAchieved == "Good" | LevelAchieved == "Basic" ~ "Met",
+    LevelAchieved == "Rudimentary" | LevelAchieved == "Unacceptable" ~ "Not",
+    TRUE ~ "Other"))
+
+z <- x %>% summarise(N = n_distinct(UserId), Met = mean((Met == "Met"), na.rm = TRUE))
+
+y %>% mutate(ay = ay, main_n = z$N, main_outcome = z$Met)
+```
+
+Done.
+
+
+
+## Case HRM Apply
+
+
