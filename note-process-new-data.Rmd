@@ -1,6 +1,8 @@
 ---
 title: "Process new data"
-output: html_notebook
+output:
+  word_document: default
+  html_notebook: default
 ---
 
 # Introduction
@@ -326,8 +328,165 @@ y %>% mutate(ay = ay, main_n = z$N, main_outcome = z$Met)
 
 Done.
 
+## Consolidate the Achievement Levels
+
+```{r}
+x <- levels(factor(rubrics$`Rubric Object Criteria 6-Name`))
+x[str_detect(x, "Major")]
+x[str_detect(x, "Minor")]
+x[str_detect(x, "Certificate")]
+x[str_detect(x, "Specialization")]
+```
 
 
-## Case HRM Apply
+```{r}
+y <- rubrics %>% filter(str_detect(`Rubric Object Criteria 6-Name`, "Major|Minor|Certificate|Specialization|MBA|New Criterion|Sorting values|Diplomacy certificate", negate = TRUE))
+
+# y %>% filter(`Rubric Object Levels 6-Name` == "Accounting")
+# y %>% filter(`Rubric Object Levels 6-Name` == "Level 1")
+# y %>% filter(`Rubric Object Levels 6-Name` == "Business Analytics")
+# y %>% filter(`Rubric Object Levels 6-Name` == "No")
+
+x <- levels(factor(y$`Rubric Object Levels 6-Name`))
+levels(factor(x))
+
+z <- str_replace_all(x, "[^a-zA-Z\\s]+", "")
+z <- str_trim(z)
+levels(factor(z))
+```
+
+              
+- Excellent, Good, Basic, Rudimentary, and Unnaceptable.
+- Score rates are 100, 85, 75, 65, 0%, respectively.
+- Undergrad is "met" if 75% or above.
+
+```{r}
+patterns <- c(
+  "Unsatisactory" = "Unsatisfactory",
+  "Unsatisfactory" = "Unacceptable",
+  "Fair" = "Basic"
+)
+```
+
+```{r}
+# Where are those special ones?
+rubrics %>% filter(`Rubric Object Levels 6-Name`=="Emerging")
+# Jo's
+test <- rubrics %>% filter(Course == "BUS242") %>% pull(`Rubric Object Levels 6-Name`)
+levels(factor(test))
+# Mixed??
+# rubrics %>% filter(Course == "BUS242") %>% group_by(`Rubric Object Levels 6-Name`) %>% summarise(mean(`Rubric Assessment Criteria 6-Score`, na.rm = TRUE))
+rubrics %>% filter(Course == "BUS242") 
+test <- rubrics %>% filter(Course == "BUS242")
+levels(factor(test$AssessmentId))
+names(test)
+# AssessmentId? Some strange character??
+levels(factor(test[, 2]))
+colnames(rubrics)[2] <- "AssessmentId"
+test <- rubrics %>% filter(Course == "BUS242")
+levels(factor(test$AssessmentId))
+# Why are the so many?
+levels(factor(test$RubricId))
+# Okay
+rubrics %>% filter(RubricId == "179823")
+test <- rubrics %>% filter(RubricId == "179824") %>% pull(`Rubric Object Levels 6-Name`)
+levels(factor(test))
+rubrics %>% filter(RubricId == "179824") %>% group_by(`Rubric Object Levels 6-Name`) %>% summarise(mean(`Rubric Assessment Criteria 6-Score`, na.rm = TRUE))
+test <- rubrics %>% filter(RubricId == "180495") %>% pull(`Rubric Object Levels 6-Name`)
+levels(factor(test))
+```
+
+Emerging = 3/5 > Rudimentary
+Developing = 4/5 > Basic
+Advanced = 5/5 > Excellent
 
 
+```{r}
+patterns <- c(
+  "Unsatisactory" = "Unsatisfactory",
+  "Unsatisfactory" = "Unacceptable",
+  "Fair" = "Basic",
+  "Advaned" = "Excellent",
+  "Advanced" = "Excellent",
+  "Devloping" = "Basic",
+  "Developing" = "Basic",
+  "Emerging" = "Rudimentary"
+)
+```
+
+Next
+
+```{r}
+# Where are those special ones?
+rubrics %>% filter(`Rubric Object Levels 6-Name`=="Exemplary")
+# Paul...
+test <- rubrics %>% filter(Course == "BUS782") %>% pull(`Rubric Object Levels 6-Name`)
+levels(factor(test))
+names(rubrics)
+
+rubrics %>% filter(Course == "BUS782") %>% group_by(AssessmentId, `Rubric Object Levels 6-Name`) %>% summarise(mean(`Rubric Assessment Criteria 6-Score`, na.rm=TRUE))
+```
+
+Developing > 16.5/28 = 0.58 , 22/25 = .88?
+Exemplary > 10/28 = 0.35, 15/25 = .6
+Proficient > 16/18, 24/25 > .96
+Satisfactory > 28/28, 25/25 > 1.00
+
+???
+
+Let's skip. BUS782 is not among the assessment.
+
+```{r}
+# Where are those special ones?
+rubrics %>% filter(`Rubric Object Levels 6-Name`=="Level 1")
+# Nan
+test <- rubrics %>% filter(Course == "FIN301") %>% pull(`Rubric Object Levels 6-Name`)
+levels(factor(test))
+
+rubrics %>% filter(Course == "FIN301") %>% group_by(AssessmentId, `Rubric Object Levels 6-Name`) %>% summarise(mean(`Rubric Assessment Criteria 6-Score`, na.rm=TRUE))
+```
+
+Some are not labelled.
+
+Level 2 > 3.5/5 = 0.7
+Level 4 > 5/5 = 1.00
+Level 3 > 4.25/5 = 0.85
+Level 1 > 0
+
+But it's not among the assessment. Can be skipped.
+
+
+Test replacements.
+
+```{r}
+y <- rubrics %>% filter(str_detect(`Rubric Object Criteria 6-Name`, "Major|Minor|Certificate|Specialization|MBA|New Criterion|Sorting values|Diplomacy certificate", negate = TRUE))
+
+x <- levels(factor(y$`Rubric Object Levels 6-Name`))
+z <- str_replace_all(x, "[^a-zA-Z\\s]+", "")
+z <- str_trim(z)
+z <- str_replace_all(z, patterns)
+
+levels(factor(z))
+```
+
+
+```{r}
+clean_levels <- function(x, patterns){
+  z <- str_replace_all(x, "[^a-zA-Z\\s]+", "")
+  z <- str_trim(z)
+  z <- str_replace_all(z, patterns)
+  z
+}
+rubrics <- rubrics %>% mutate(LevelAchieved = clean_levels(`Rubric Object Levels 6-Name`, patterns))
+  
+mdf <- rubrics %>% filter(str_detect(`Rubric Object Criteria 6-Name`, "Major|Minor|Certificate|Specialization|MBA|New Criterion|Sorting values|Diplomacy certificate", negate = TRUE))
+levels(factor(mdf$LevelAchieved))
+```
+
+Okay.
+
+# Next
+
+Now, given the fundamental change to the rubric data, I should move on to another note. Archive this.
+
+Then I should be able to actually report the outcomes.
