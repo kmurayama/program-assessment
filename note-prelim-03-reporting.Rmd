@@ -1,0 +1,326 @@
+---
+title: "Note on Reporting & Finalizing Process"
+output: html_notebook
+---
+
+# Introduction
+
+Now the data sets should be ready. Let's try to summarize each learning outcomes, while fixing the issues along the way.
+It's a bit tedious, but go over each manually. It'll save time over all.
+
+# Data
+
+Import data. New data are all stored in the Excel file under Internal Direct Assessment directory.
+
+```{r}
+library(tidyverse)
+library(readxl)
+rootpath <- "C:\\Users\\HP\\California University of Pennsylvania\\"
+datapath <- paste0(rootpath, "ACBSP data reporting - Documents\\Data\\")
+#
+path <- paste0(datapath, "Internal Direct Assessment\\")
+fn <- "Rubrics_07302021.xlsx"
+rubrics <- read_xlsx(paste0(path, fn), "rubrics")
+survey <- read_xlsx(paste0(path, fn), "survey")
+plans <- read_xlsx(paste0(path, fn), "plans")
+#
+path <- datapath
+fn <- "Assessment Data Main.xlsx"
+sh <- c("prg", "core", "mba", "map_prg", "map_core", "map_mba")
+maindf <- sapply(sh, function(x)
+  read_xlsx(paste0(path, fn), sheet = x), USE.NAMES = TRUE)
+```
+
+Clear some data issues. Note that the survey data has been manually edited to some degree.
+
+First, simplify column names of the survey and convert types
+
+```{r}
+# ncol(survey) == 22
+colnames(survey) <- c("ID", "Exclude", "Start", "Completion", "Email", "Survey Name", "Semester", "Course and Section Original", "Course and Section", "Assessment Name Original", "Assessment Name", "Rubric Grade Original", "Rubric Grade", "URL Original", "URL", "Analysis Rubric", "Action Rubric", "LO", "n", "s", "Analysis Non Rubric", "Action Non Rubric")
+colnames(survey) <- make.names(colnames(survey))
+survey <- survey %>% mutate(across(c(n, s), as.numeric))
+
+# Extract ID's from URL
+x <- str_match(survey$URL, "(rubricId\\=)(\\d+)")[, 3]
+y <- str_match(survey$URL, "(ou\\=)(\\d+)")[, 3]
+survey <- bind_cols(survey, RubricId = as.numeric(x), ou = as.numeric(y))
+# Split course and section
+survey <- survey %>% mutate(
+  Course = paste(str_sub(Course.and.Section, 1, 3),
+                 str_sub(Course.and.Section, 4, 6)),
+  Section = str_sub(Course.and.Section, 8, 10))
+
+# Split survey
+survey.r <- survey %>% filter(Rubric.Grade == "Yes")
+survey.n <- survey %>% filter(Rubric.Grade == "No")
+# Record course IDs
+clevels.r <- levels(factor(survey.r$Course))
+clevels.n <- levels(factor(survey.n$Course))
+```
+
+Likewise, rubrics. There's some special character in one of clumns.
+
+```{r}
+names(rubrics) <- make.names(names(rubrics))
+names(rubrics)
+names(rubrics)[2] <- "AssessmentId"
+names(rubrics)[4] <- "Score"
+names(rubrics)[11] <- "Criteria"
+names(rubrics)[15] <- "Level"
+
+names(rubrics)
+```
+
+
+Next, clean up the level achived in the rubric data.
+
+```{r}
+patterns <- c(
+  "Unsatisactory" = "Unsatisfactory",
+  "Unsatisfactory" = "Unacceptable",
+  "Advaned" = "Excellent",
+  "Advanced" = "Excellent",
+  "Proficient" = "Good",
+  "Devloping" = "Basic",
+  "Developing" = "Basic",
+  "Fair" = "Basic",
+  "Emerging" = "Rudimentary"
+)
+clean_levels <- function(x, patterns){
+  z <- str_replace_all(x, "[^a-zA-Z\\s]+", "")
+  z <- str_trim(z)
+  z <- str_replace_all(z, patterns)
+  z
+}
+rubrics <- rubrics %>% mutate(LevelAchieved = clean_levels(Level, patterns))
+
+# Met
+rubrics <- rubrics %>% mutate(
+  Met.UND = case_when(
+    is.na(LevelAchieved) ~ "Missing",
+    LevelAchieved == "Excellent" | LevelAchieved == "Good" | LevelAchieved == "Basic" ~ "Met",
+    LevelAchieved == "Rudimentary" | LevelAchieved == "Unacceptable" ~ "Not",
+    TRUE ~ "Other"),
+  Met.GRD = case_when(
+    is.na(LevelAchieved) ~ "Missing",
+    LevelAchieved == "Excellent" | LevelAchieved == "Good" ~ "Met",
+    LevelAchieved == "Basic" | LevelAchieved == "Rudimentary" | LevelAchieved == "Unacceptable" ~ "Not",
+    TRUE ~ "Other"),
+  
+  )
+```
+
+Then, combine the two for further processes.
+
+```{r}
+rubrics.orig <- rubrics
+rubrics <- rubrics.orig # Prevent iterative proc
+rubrics <- left_join(rubrics, survey.r, by = "RubricId", suffix = c(".rub", ".suv"))
+# Split into achievements and misc like attributes
+rubrics.a <- rubrics %>% filter(str_detect(Criteria, "Major|Minor|Certificate|Specialization|MBA|New Criterion|Sorting values|Diplomacy certificate", negate = TRUE))
+rubrics.m <- rubrics %>% filter(str_detect(Criteria, "Major|Minor|Certificate|Specialization|MBA|New Criterion|Sorting values|Diplomacy certificate", negate = FALSE))
+```
+
+Lastly, define some misc variables.
+
+```{r}
+# Define misc
+clevels.plan <- levels(factor(plans$Course))
+```
+
+
+# Functions
+
+
+# Report
+
+Finish the Core and MBA first. Disaggregation by major or likes can be done later, though.
+Then, work on the program assessments.
+
+I would like to automate the rubric/non-rubric distinction, but it might be tricky due to the disagreement between the information in mapping and survey.
+Let's give it a brief try.
+
+## Core
+
+```{r}
+maindf$map_core
+```
+
+BUS 1 is from Peregrine. Ahmet will handle it.
+
+The rest come from courses.
+
+1. Extract a row.
+2. Using that information, aggregate assessment outcome. (Check keys)
+3. Merge that into the extracted row.
+4. Trim that new vector to match the main data.
+
+```{r}
+plolist <- maindf$map_core %>% filter(group1 == "Course")
+# Check for keys
+temp <- plolist[1, ]
+test <- rubrics.a %>% filter(Course == temp$group2) %>% pull(Criteria)
+# levels(factor(test))
+# Looks fine. Just ignore cases.
+# str_match(test2, regex("PLO2", ignore_case = TRUE))
+```
+
+Now actual process.
+
+```{r}
+plolist <- maindf$map_core %>% filter(group1 == "Course")
+# Loop through
+x <- plolist[1, ]
+mdf <- rubrics.a %>%
+  filter(Course == x$group2,
+         Assessment.Name == x$tool,
+         str_detect(Criteria, regex(x$internal_rubric_keys2019,
+                                    ignore_case = TRUE)))
+result1 <- mdf %>% summarise(main_n = n_distinct(UserId), main_outcome = mean((Met.UND == "Met"), na.rm = TRUE))
+
+cbind(x, result1)
+```
+
+
+```{r}
+# Loop
+get_results <- function(plolist, i=1, mdf=mdf){
+  x <- plolist[i, ]
+  mdf <- rubrics.a %>%
+    filter(Course == x$group2,
+           Assessment.Name == x$tool,
+           str_detect(Criteria, regex(x$internal_rubric_keys2020,
+                                      ignore_case = TRUE)))
+  result <- mdf %>%
+    summarise(main_n = n_distinct(UserId),
+              main_outcome = mean((Met.UND == "Met"), na.rm = TRUE))
+  criteria <- levels(factor(mdf$Criteria))
+  
+  list(result = result, allresult = cbind(x, result), criteria = criteria, data = mdf)
+}
+
+outputs <- sapply(1:9, function(i) get_results(plolist, i))
+```
+
+
+```{r}
+outputs[3, ]
+```
+
+Issue with 6th and 7th. PLO 7 and 8.
+
+```{r}
+# plolist[6, ]
+# plolist[7, ]
+```
+
+When cleaning the survey data, I didn't align the name with the ones in the main database. Fix the survey data manually...
+
+Fixed.
+
+Now, check the data.
+
+```{r}
+outputs[1, ]
+```
+
+The numbers of unique students are widely different, having two clusters.
+PLO 3, 5, 6, 10.
+
+What are the numbers of reported sections?
+
+```{r}
+x <- plolist[1, ]
+mdf <- rubrics.a %>%
+  filter(Course == x$group2,
+         Assessment.Name == x$tool,
+         str_detect(Criteria, regex(x$internal_rubric_keys2019,
+                                    ignore_case = TRUE)))
+mdf %>% summarise(main_n = n_distinct(UserId), main_outcome = mean((Met.UND == "Met"), na.rm = TRUE), sect_n = n_distinct(Section, Semester))
+
+```
+
+Put it back to the function... Result confirmed.
+
+It would be convenient to keep the sub-sample used for later analysis instead.
+Implemented.
+
+Next, merge the result for the main database. Imlement similarly.
+
+```{r}
+outputs_core <- bind_rows(outputs[1, ])
+outputs_core
+```
+
+Done. Once it's merged into the main database, the rest of the procedures (visualization) should follow the ones last year... although missing the external assessments.
+
+## Program
+
+### Rubrics
+
+```{r}
+plolist <- maindf$map_prg %>% filter(group1 == "Course", tool != "Exam")
+plolist
+```
+
+20 items that are non-exam.
+
+Function returned empty sets. Check assessment name matches.
+
+- ACC 3: ACC 318 is only reported by one. Only exam scores.
+- ACC 4: Name difference. "Case Project" against "Audit Assignment"
+- ECO 3-5: Name difference. "Final Term Paper" against "Project"
+- FIN 1,2: Name difference. "Ratio Analysis" against "Capital Budgeting".
+- HRM 1-3: Minor name difference. "Simulation #1" against "Simulation"?
+- BUS 345: Name fixed already.
+- MKT 1-3: Name difference. Can't identify "Simulation"
+- MIS 401: "Zappos Case Study" New. According to Adnan's email "For MIS 401, we should be focusing on L02." No rubric.
+
+
+```{r}
+plolist <- maindf$map_prg %>% filter(group1 == "Course", internal_rubric_keys2020 != "No Rubric")
+plolist$tool
+# Loop through
+x <- plolist[5, ]
+x
+mdf <- rubrics.a %>%
+  filter(Course == x$group2,
+         Assessment.Name == x$tool)
+mdf
+
+mdf <- mdf %>% filter(str_detect(Criteria, regex(x$internal_rubric_keys2020,
+                                    ignore_case = TRUE)))
+result1 <- mdf %>% summarise(main_n = n_distinct(UserId), main_outcome = mean((Met.UND == "Met"), na.rm = TRUE))
+result1
+```
+
+- ACC 3: 
+- ACC 4: 
+- ECO 3-5: 
+- FIN 1,2: Rubric has no LevelAchievedId etc. There are scores, however.
+- HRM 1-3: Pool them for now.
+- BUS 345: 
+- MKT 401: Name difference. Can't identify "Simulation"
+- MIS 401: "Zappos Case Study" New. According to Adnan's email "For MIS 401, we should be focusing on L02." No further information about the rubric rows.
+
+
+```{r}
+plolist <- maindf$map_prg %>% filter(group1 == "Course", internal_rubric_keys2020 != "No Rubric")
+plolist
+outputs <- sapply(1:9, function(i) get_results(plolist, i))
+
+outputs[1, ]
+```
+
+## Non-Rubrics
+
+```{r}
+survey.n
+```
+
+```{r}
+plolist <- maindf$map_prg %>% filter(group1 == "Course", internal_rubric_keys2020 == "No Rubric")
+plotlist
+```
+
