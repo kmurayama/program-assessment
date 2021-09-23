@@ -195,11 +195,11 @@ str_remove(z, "Any ")
 
 ```{r}
 patterns <- c(
-  "any business majorminor" = "Other",
-  "Any other business major/minor" = "Other",
+  "any business majorminor" = "Business",
+  "Any other business major/minor" = "Business",
   "Basic (75%)" = "Error",
-  "Business (Non-Marketing)" = "Other",
-  "Business Non-Marketing" = "Other",
+  "Business (Non-Marketing)" = "Business",
+  "Business Non-Marketing" = "Business",
   "Corporate Communication" = "Corporate Communication",
   "Economics" = "Economics",
   "Economics major/minor" = "Economics",
@@ -250,11 +250,11 @@ sdf <- mdf %>% mutate(
   Major = str_trim(Major),
   Major = str_replace_all(Major, "General (B|b)usine(s)+", "General Business"),
   Major = str_replace_all(Major, "Gen Bus", "General Business"),
-  Major = str_replace_all(Major, "Interdisciplinary Studies in Business and Commerce", "ISBC"),
+  Major = str_replace_all(Major, "Interdisciplinary Studies in Business and Commerce", "IGBC"),
   Major = str_replace_all(Major, "Management Information Systems", "MIS"),
   Major = str_replace_all(Major, "Human Resources Management", "HRM"),
-  Major = str_replace_all(Major, "Integrated Global Business", "IGBC")
-  
+  Major = str_replace_all(Major, "Integrated Global Business", "IGBC"),
+  Major = str_replace_all(Major, "Other", "Business")
 )
 
 levels(factor(sdf$Major))
@@ -270,7 +270,8 @@ levels(factor(mdf$Assessment.Name))
 plolist <- maindf$map_core %>% filter(group1 == "Course")
 i <- 1
 x <- plolist[i, ]
-x
+
+head(sdf)
 
 tdf <- sdf %>%
   filter(Course == x$group2,
@@ -414,7 +415,7 @@ ggplot(result, aes(x = Major, y = main_outcome)) + geom_col() + theme(axis.text.
 ## Loop
 
 ```{r}
-vis_core <- function(i){
+sum_core <- function(i){
   x <- plolist[i, ]
   tdf <- sdf %>%
     filter(Course == x$group2,
@@ -425,11 +426,33 @@ vis_core <- function(i){
     summarise(main_n = n_distinct(UserId),
               main_outcome = mean((Met.UND == "Met"), na.rm = TRUE))
   criteria <- levels(factor(tdf$Criteria))
-  
+  result
+}
+vis_core <- function(result){
   ggplot(result, aes(x = Major, y = main_outcome)) + geom_col() + theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) + ggtitle(paste(x$plo, x$tool))
+  
 }
 
-lapply(1:9, vis_core)
+
+lres <- lapply(1:9, sum_core)
+# lapply(lres, vis_core)
+
+
+# Quick conversion for data export?
+# Following the database. Each row is PLO and year. Column shows variables.
+names(lres) <- paste("BUS", 1:9)
+
+lres2 <- list()
+
+for (i in 1:9){
+  lres2[[i]] <- lres[[i]] %>% mutate(PLO = i)
+}
+
+xx <- bind_rows(lres2)
+
+output <- pivot_wider(xx, id_cols = PLO, names_from = Major, values_from = c(main_outcome, main_n))
+
+write_csv(output, "out/core_internal.csv")
 ```
  
  
