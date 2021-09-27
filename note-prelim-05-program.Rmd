@@ -145,7 +145,7 @@ See Note 3 for the Business Core assessment with disaggregation by majors.
 
 There are exam/score based assessments and rubric-based assessments by design. There may be some assessments that have both "by accident" (e.g., some faculty members didn't follow the direction). Ignore the latter case for now.
 
-## Check Assessments by Rubric
+## Check by Rubric
 
 Program learning objectives (PLOs) are stored in the database. Filter the PLOs that use rubrics.
 
@@ -154,6 +154,9 @@ This PLO list contains the relevant information including the identifiers to pic
 ```{r}
 plolist <- maindf$map_prg %>% filter(group1 == "Course", internal_rubric_keys2020 != "No Rubric")
 plolist
+
+plolist <- bind_rows(plolist, maindf$map_prg %>% filter(plo_id == "FIN 1-Summative-Internal"))
+plolist <- bind_rows(plolist, maindf$map_prg %>% filter(plo_id == "FIN 2-Summative-Internal"))
 ```
 
 Using this list, identify the observations and check them for errors.
@@ -188,11 +191,50 @@ xx <- bind_rows(lout)
 xx
 ```
 
-Names are mostly corrected in Note 3. A remaining major issue is from MKT 401, where the names vary within each section and across sections. Moreover, the description in the OneNote differs from what is stated in the survey and contains no rubric. >> Follow up with Rich and Al.
+Names are mostly corrected in Note 3.
+
+A remaining major issue is from MKT 401, where the names vary within each section and across sections. Moreover, the description in the OneNote differs from what is stated in the survey and contains no rubric. >> Follow up with Rich and Al.
+
+In addition, FIN 302 Capital Budgeting needs some clarification. >> Follow up with Chris and Nan.
 
 Export the data for Nuventive reporting.
 
 ```{r}
 write_csv(xx, "out/prg_internal.csv")
+```
+
+
+## Check by Non-Rubric
+
+```{r}
+survey.n
+```
+
+```{r}
+plolist <- maindf$map_prg %>% filter(group1 == "Course", internal_rubric_keys2020 == "No Rubric")
+plolist
+
+```
+ Check manually.
+ 
+```{r}
+survey.n %>% filter(Course == "ACC 331")
+survey.n %>% filter(Course == "ACC 318")
+survey.n %>% filter(Course == "ECO 301")
+survey.n %>% filter(Course == "ECO 302")
+survey.n %>% filter(Course == "FIN 302")
+survey.n %>% filter(Course == "MIS 401")
+```
+
+
+- ACC 331. Only one is reported. "calculate product/period costs using multiple costing methods". Is that ACC 2?
+- ECO 302 is missing. Not offered?
+- FIN 302 reported with rubric. Needs update in the database. (How do I keep track of the change over time??)
+- MIS 401. Confirmed. Use for MIS 2.
+
+Now, manually append the generated file for reporting.
+
+```{r}
+survey.n %>% group_by(Course) %>% summarise(n = sum(n), s = sum(s)) %>% mutate(Met = s/n)
 ```
 
