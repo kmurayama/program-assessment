@@ -1,8 +1,10 @@
 ---
 title: "Process new data"
 output:
-  word_document: default
+  html_document:
+    df_print: paged
   html_notebook: default
+  word_document: default
 ---
 
 # Introduction

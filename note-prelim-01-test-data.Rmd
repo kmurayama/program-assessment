@@ -1,9 +1,11 @@
 ---
 title: "Test Importing New Data Format"
 output:
-  word_document: default
+  html_document:
+    df_print: paged
   html_notebook: default
   pdf_document: default
+  word_document: default
 ---
 
 # Introduction

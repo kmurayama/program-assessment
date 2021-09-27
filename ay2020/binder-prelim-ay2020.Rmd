@@ -1,0 +1,22 @@
+---
+title: "binder-prelim-2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+The internal assessment for the academic year 2020 (2020-2021) has a different format from the previous year, due to the change in D2L. While many of the existing codes *should be* usable, I decided to start from scratch and adopt the old codes as needed.
+
+In this document, I link to those notes to "bind" them so that I can navigate easily later.
+
+# Content
+
+[Note 1](note-prelim-01-test-data.html) attempts to load the data set. Then, [Note 2](note-prelim-02-process.html) explores the data set with the new variables. Keep in mind that the script may not work after the data set (especially the survey part) is edited manually. So, those reports need to be archived.
+
+[Note 3]() tests the data for Business Core and Program assessments. Due to time constraint, moved on to [Note 4](note-prelim-04-core.html) before finishing the Note 3 to compile the core data.
+
+

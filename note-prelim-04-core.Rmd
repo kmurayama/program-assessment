@@ -1,8 +1,10 @@
 ---
 title: "Core Disaggregation"
 output:
-  word_document: default
+  html_document:
+    df_print: paged
   html_notebook: default
+  word_document: default
 ---
 
 # Introduction
@@ -452,7 +454,7 @@ xx <- bind_rows(lres2)
 
 output <- pivot_wider(xx, id_cols = PLO, names_from = Major, values_from = c(main_outcome, main_n))
 
-write_csv(output, "out/core_internal.csv")
+# write_csv(output, "out/core_internal.csv")
 ```
  
  
