@@ -324,3 +324,6 @@ plolist <- maindf$map_prg %>% filter(group1 == "Course", internal_rubric_keys202
 plotlist
 ```
 
+# Next
+
+This note has been left too long without completing. It's hard to understand what needs to be done. Let's restart. >> Note 5

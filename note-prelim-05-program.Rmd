@@ -1,0 +1,198 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Introduction
+
+Compile the Program assessments for AY 2020.
+
+# Data
+
+Import data. New data are all stored in the Excel file under Internal Direct Assessment directory.
+
+```{r}
+library(tidyverse)
+library(readxl)
+rootpath <- "C:\\Users\\HP\\California University of Pennsylvania\\"
+datapath <- paste0(rootpath, "ACBSP data reporting - Documents\\Data\\")
+#
+path <- paste0(datapath, "Internal Direct Assessment\\")
+fn <- "Rubrics_07302021.xlsx"
+rubrics <- read_xlsx(paste0(path, fn), "rubrics")
+survey <- read_xlsx(paste0(path, fn), "survey")
+plans <- read_xlsx(paste0(path, fn), "plans")
+#
+path <- datapath
+fn <- "Assessment Data Main.xlsx"
+sh <- c("prg", "core", "mba", "map_prg", "map_core", "map_mba")
+maindf <- sapply(sh, function(x)
+  read_xlsx(paste0(path, fn), sheet = x), USE.NAMES = TRUE)
+```
+
+Note that the new assessment data comes from the "Rubrics_....xlsx" while the assessment information comes from "Assessment Data Main.xlsx".
+Search over the assessments (learning objectives, names, etc.) is done over the latter.
+
+## Data Process
+
+Clear some data issues. Note that the survey data has been manually edited to some degree.
+
+First, simplify column names of the survey and convert types
+
+```{r}
+colnames(survey) <- c("ID", "Exclude", "Start", "Completion", "Email", "Survey Name", "Semester", "Course and Section Original", "Course and Section", "Assessment Name Original", "Assessment Name", "Rubric Grade Original", "Rubric Grade", "URL Original", "URL", "Analysis Rubric", "Action Rubric", "LO", "n", "s", "Analysis Non Rubric", "Action Non Rubric")
+colnames(survey) <- make.names(colnames(survey))
+survey <- survey %>% mutate(across(c(n, s), as.numeric))
+
+# Extract ID's from URL
+x <- str_match(survey$URL, "(rubricId\\=)(\\d+)")[, 3]
+y <- str_match(survey$URL, "(ou\\=)(\\d+)")[, 3]
+survey <- bind_cols(survey, RubricId = as.numeric(x), ou = as.numeric(y))
+# Split course and section
+survey <- survey %>% mutate(
+  Course = paste(str_sub(Course.and.Section, 1, 3),
+                 str_sub(Course.and.Section, 4, 6)),
+  Section = str_sub(Course.and.Section, 8, 10))
+
+# Split survey
+survey.r <- survey %>% filter(Rubric.Grade == "Yes")
+survey.n <- survey %>% filter(Rubric.Grade == "No")
+# Record course IDs
+clevels.r <- levels(factor(survey.r$Course))
+clevels.n <- levels(factor(survey.n$Course))
+```
+
+Likewise, rubrics. There's some special character in one of columns.
+
+```{r}
+names(rubrics) <- make.names(names(rubrics))
+names(rubrics)[2] <- "AssessmentId"
+names(rubrics)[4] <- "Score"
+names(rubrics)[11] <- "Criteria"
+names(rubrics)[15] <- "Level"
+```
+
+Next, clean up the level achieved in the rubric data.
+
+```{r}
+patterns <- c(
+  "Unsatisactory" = "Unsatisfactory",
+  "Unsatisfactory" = "Unacceptable",
+  "Advaned" = "Excellent",
+  "Advanced" = "Excellent",
+  "Proficient" = "Good",
+  "Devloping" = "Basic",
+  "Developing" = "Basic",
+  "Fair" = "Basic",
+  "Emerging" = "Rudimentary"
+)
+clean_levels <- function(x, patterns){
+  z <- str_replace_all(x, "[^a-zA-Z\\s]+", "")
+  z <- str_trim(z)
+  z <- str_replace_all(z, patterns)
+  z
+}
+rubrics <- rubrics %>% mutate(LevelAchieved = clean_levels(Level, patterns))
+
+# Met
+rubrics <- rubrics %>% mutate(
+  Met.UND = case_when(
+    is.na(LevelAchieved) ~ "Missing",
+    LevelAchieved == "Excellent" | LevelAchieved == "Good" | LevelAchieved == "Basic" ~ "Met",
+    LevelAchieved == "Rudimentary" | LevelAchieved == "Unacceptable" ~ "Not",
+    TRUE ~ "Other"),
+  Met.GRD = case_when(
+    is.na(LevelAchieved) ~ "Missing",
+    LevelAchieved == "Excellent" | LevelAchieved == "Good" ~ "Met",
+    LevelAchieved == "Basic" | LevelAchieved == "Rudimentary" | LevelAchieved == "Unacceptable" ~ "Not",
+    TRUE ~ "Other"),
+  
+  )
+```
+
+Then, combine the two for further processes.
+
+```{r}
+rubrics.orig <- rubrics
+rubrics <- rubrics.orig # Prevent iterative proc
+rubrics <- left_join(rubrics, survey.r, by = "RubricId", suffix = c(".rub", ".suv"))
+# Split into achievements and misc like attributes
+rubrics.a <- rubrics %>% filter(str_detect(Criteria, "Major|Minor|Certificate|Specialization|MBA|New Criterion|Sorting values|Diplomacy certificate", negate = TRUE))
+rubrics.m <- rubrics %>% filter(str_detect(Criteria, "Major|Minor|Certificate|Specialization|MBA|New Criterion|Sorting values|Diplomacy certificate", negate = FALSE))
+```
+
+Lastly, define some misc variables.
+
+```{r}
+# Define misc
+clevels.plan <- levels(factor(plans$Course))
+```
+
+## Data Notes
+
+Some standardization is needed, although some of them may not be worthwhile at the moment. The department will be split into different groups.
+In order to make the assessment for 2021-22 easy, I shall focus on the primary concerns. List them with solutions.
+
+- Signature Assignment names: Drop menu in survey
+- Level Achieved: No action. Use the rubrics posted.
+- 
+
+# Core Assessment
+
+See Note 3 for the Business Core assessment with disaggregation by majors.
+
+# Program Assessment
+
+There are exam/score based assessments and rubric-based assessments by design. There may be some assessments that have both "by accident" (e.g., some faculty members didn't follow the direction). Ignore the latter case for now.
+
+## Check Assessments by Rubric
+
+Program learning objectives (PLOs) are stored in the database. Filter the PLOs that use rubrics.
+
+This PLO list contains the relevant information including the identifiers to pick up relevant assessment outcomes.
+
+```{r}
+plolist <- maindf$map_prg %>% filter(group1 == "Course", internal_rubric_keys2020 != "No Rubric")
+plolist
+```
+
+Using this list, identify the observations and check them for errors.
+
+- Loop through rows
+- Keep the summary stats
+- Have an easy access to review the data (Easier to do with object... Later?)
+
+
+```{r}
+get_outcome <- function(i, dict = plolist, out = rubrics.a){
+  # From the row number, extract relevant assessment outcomes
+  x <- dict[i, ]
+  # Obtain a summary of the assessment
+  mdf <- out %>% filter(Course == x$group2, Assessment.Name == x$tool) %>% 
+    filter(str_detect(Criteria,
+                      regex(x$internal_rubric_keys2020, ignore_case = TRUE)))
+  res <- mdf %>% summarise(
+    plo = x$plo,
+    main_n = n_distinct(UserId),
+    main_outcome = mean((Met.UND == "Met"), na.rm = TRUE))
+  res
+}
+
+```
+
+Since I cannot use the same naming method as Core (where it only had BUS), use the PLO from the dictionary. Then, it's ready to be combined by rows. (Also, unlike BUS, there is no need to widen the data.)
+
+```{r}
+lout <- lapply(1:nrow(plolist), get_outcome)
+xx <- bind_rows(lout)
+xx
+```
+
+Names are mostly corrected in Note 3. A remaining major issue is from MKT 401, where the names vary within each section and across sections. Moreover, the description in the OneNote differs from what is stated in the survey and contains no rubric. >> Follow up with Rich and Al.
+
+Export the data for Nuventive reporting.
+
+```{r}
+write_csv(xx, "out/prg_internal.csv")
+```
+
