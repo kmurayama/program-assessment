@@ -252,11 +252,11 @@ sdf <- mdf %>% mutate(
   Major = str_trim(Major),
   Major = str_replace_all(Major, "General (B|b)usine(s)+", "General Business"),
   Major = str_replace_all(Major, "Gen Bus", "General Business"),
-  Major = str_replace_all(Major, "Interdisciplinary Studies in Business and Commerce", "IGBC"),
+  Major = str_replace_all(Major, "Interdisciplinary Studies in Business and Commerce", "General Business"),
   Major = str_replace_all(Major, "Management Information Systems", "MIS"),
   Major = str_replace_all(Major, "Human Resources Management", "HRM"),
-  Major = str_replace_all(Major, "Integrated Global Business", "IGBC"),
-  Major = str_replace_all(Major, "Other", "Business")
+  Major = str_replace_all(Major, "Integrated Global Business", "General Business"),
+  Major = str_replace_all(Major, "Other", "General Business")
 )
 
 levels(factor(sdf$Major))
@@ -453,8 +453,11 @@ for (i in 1:9){
 xx <- bind_rows(lres2)
 
 output <- pivot_wider(xx, id_cols = PLO, names_from = Major, values_from = c(main_outcome, main_n))
+```
 
-# write_csv(output, "out/core_internal.csv")
+
+```{r}
+write_csv(output, "out/core_internal.csv")
 ```
  
  

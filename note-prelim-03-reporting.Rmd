@@ -321,7 +321,7 @@ survey.n
 
 ```{r}
 plolist <- maindf$map_prg %>% filter(group1 == "Course", internal_rubric_keys2020 == "No Rubric")
-plotlist
+plolist
 ```
 
 # Next
