@@ -238,3 +238,283 @@ Now, manually append the generated file for reporting.
 survey.n %>% group_by(Course) %>% summarise(n = sum(n), s = sum(s)) %>% mutate(Met = s/n)
 ```
 
+# MAcc Assessment
+
+Apparently, MAcc Internal Assessment is done as well. (No discussions as far as I can tell from my meeting notes.)
+
+```{r}
+x <- rubrics.a %>% filter(Course == "ACC 735")
+levels(factor(x$Assessment.Name))
+# "Final Whitepaper"
+levels(factor(x$LevelAchieved))
+levels(factor(x$Met.GRD))
+levels(factor(x$Score))
+# Useless achievement level data. Sum the score instead.
+
+x <- rubrics.a %>% filter(Course == "ACC 710")
+levels(factor(x$Assessment.Name))
+# "Financial Accounting Research Project"
+levels(factor(x$LevelAchieved))
+# "Basic" "Excellent" "Good"
+levels(factor(x$Met.GRD))
+levels(factor(x$Score))
+```
+
+```{r}
+x <- rubrics.a %>% filter(Course == "ACC 735")
+scores <- x %>% group_by(UserId, Assessment.Name) %>%
+  summarise(Score = sum(Score)) %>%
+  mutate(Met.GRD = case_when(
+    is.na(Score) ~ "Missing",
+    Score >= 85 ~ "Met",
+    Score < 85 ~ "Not",
+    TRUE ~ "Other"))
+
+res1 <- scores %>% ungroup() %>% 
+  summarise(
+    plo = "MACC 1",
+    main_n = n_distinct(UserId),
+    main_outcome = mean((Met.GRD == "Met"), na.rm = TRUE))
+
+res1
+```
+
+
+
+```{r}
+mdf <- rubrics.a %>%
+  filter(Course == "ACC 710",
+         Assessment.Name == "Financial Accounting Research Project")
+
+res2 <- mdf %>% summarise(
+  plo = "MACC 2",
+  main_n = n_distinct(UserId),
+  main_outcome = mean((Met.GRD == "Met"), na.rm = TRUE))
+```
+
+```{r}
+xx <- bind_rows(list(res1, res2))
+write_csv(xx, "out/macc_internal.csv")
+```
+
+
+# IGB Program
+
+Apparently Integrated Global Business is assessed as well. Now I found Ed updated his Excel file in the shared folder. Use BUS 345.
+
+Prepare for attributes. Hopefully, it's not as messy as BUS 499.
+
+```{r}
+att <- rubrics.m %>%
+  filter(Course == "BUS 345") %>% select(UserId, Criteria, Level, Course.and.Section) %>%
+  filter(str_detect(Criteria,
+                    regex("Major", ignore_case = TRUE)))
+
+levels(factor(att$Level))
+levels(factor(att$Criteria))
+```
+
+Test some replacements
+```{r}
+x <- levels(factor(att$Level))
+x
+
+str_replace_all(x, "Non-(B|b)usiness.*", "Other")
+str_replace_all(x, "Other (B|b)usiness.*", "General Business") # Econ?
+str_replace_all(x, "Excellent|Rudimentary|Unacceptable", "Error") # Econ?
+
+
+mdf <- att %>% rename(Major = Level)
+sdf <- mdf %>% mutate(
+  Major = str_replace_all(Major, "Non-(B|b)usiness.*", "Other"),
+  Major = str_replace_all(Major, "Integrated Global Business", "IGB"),
+  Major = str_replace_all(Major, "Other (B|b)usiness.*", "General Business"),
+  Major = str_replace_all(Major, "Excellent|Rudimentary|Unacceptable", "Error")
+)
+
+levels(factor(sdf$Major))
+```
+
+```{r}
+names(sdf)
+
+head(sdf)
+
+sdf %>% summarise(n_distinct(UserId, Course.and.Section))
+```
+```{r}
+mdf <- left_join(rubrics.a %>% filter(Course == "BUS 345"),
+               sdf %>% select(-Criteria),
+               by = c("UserId", "Course.and.Section"))
+
+names(mdf)
+```
+
+```{r}
+lres <- list()
+```
+
+
+First CLO.
+
+```{r}
+sdf <- mdf %>%
+  filter(Course == "BUS 345", Assessment.Name == "Ethics Final Paper") %>% 
+  filter(str_detect(Criteria,
+                    regex("Plo1", ignore_case = TRUE)))
+
+lres[["IGB1"]] <- sdf %>% group_by(Major) %>% 
+  summarise(main_n = n_distinct(UserId),
+            main_outcome = mean((Met.UND == "Met"), na.rm = TRUE)) %>% 
+  mutate(PLO = "LGB1")
+```
+
+```{r}
+sdf <- mdf %>%
+  filter(Course == "BUS 345", Assessment.Name == "Ethics Final Paper") %>% 
+  filter(str_detect(Criteria,
+                    regex("Plo5", ignore_case = TRUE)))
+
+lres[["IGB2"]] <- sdf %>% group_by(Major) %>% 
+  summarise(main_n = n_distinct(UserId),
+            main_outcome = mean((Met.UND == "Met"), na.rm = TRUE)) %>% 
+  mutate(PLO = "LGB2")
+```
+
+```{r}
+sdf <- mdf %>%
+  filter(Course == "BUS 345", Assessment.Name == "Ethics Final Paper") %>% 
+  filter(str_detect(Criteria,
+                    regex("Plo7", ignore_case = TRUE)))
+
+lres[["IGB3"]] <- sdf %>% group_by(Major) %>% 
+  summarise(main_n = n_distinct(UserId),
+            main_outcome = mean((Met.UND == "Met"), na.rm = TRUE)) %>% 
+  mutate(PLO = "LGB3")
+```
+```{r}
+sdf <- mdf %>%
+  filter(Course == "BUS 345", Assessment.Name == "Ethics Reflection") %>% 
+  filter(str_detect(Criteria,
+                    regex(".*", ignore_case = TRUE)))
+
+lres[["IGB4"]] <- sdf %>% group_by(Major) %>% 
+  summarise(main_n = n_distinct(UserId),
+            main_outcome = mean((Met.UND == "Met"), na.rm = TRUE)) %>% 
+  mutate(PLO = "LGB4")
+```
+
+```{r}
+xx <- bind_rows(lres)
+
+output <- pivot_wider(xx, id_cols = PLO, names_from = Major, values_from = c(main_outcome, main_n))
+```
+
+```{r}
+output
+write_csv(output, "out/igb_internal.csv")
+```
+
+# Marketing
+
+```{r}
+xx <- rubrics.a %>% filter(Course == "MKT 401")
+levels(factor(xx$Name))
+```
+```{r}
+levels(factor(xx$Assessment.Name))
+```
+```{r}
+sig1 <- xx %>% filter(Assessment.Name== "Strategic Plan")
+sig2 <- xx %>% filter(Assessment.Name== "Management Audit")
+sig3 <- xx %>% filter(Assessment.Name== "Advertising Story Board")
+```
+
+```{r}
+table(sig1$Criteria, sig1$Semester)
+```
+
+
+```{r}
+table(sig2$Criteria, sig2$Semester)
+```
+
+```{r}
+table(sig3$Criteria, sig3$Semester)
+```
+
+It's gonna be a paint to reconcile summer and spring for Sig 1. Perhaps I can skip for now.
+
+Many learning objectives are still there. PLOs are spread across assignments. I want a proper documentation for this. Again, simplify as needed for now.
+
+How can I handle this? Merge the assignments into one. Aggregate by student. (Number would vary due to missing submissions though.)
+
+
+```{r}
+sig <- xx %>% filter(Assessment.Name %in% c("Strategic Plan", "Management Audit", "Advertising Story Board"))
+```
+
+
+
+```{r}
+plo1 <- sig %>% filter(str_detect(Criteria, "PLO 1"))
+levels(factor(plo1$Criteria))
+plo1 <- plo1 %>% summarise(Met = mean(Met.UND == "Met"), n = n_distinct(UserId))
+```
+```{r}
+plo2 <- sig %>% filter(str_detect(Criteria, "PLO 2"))
+levels(factor(plo2$Criteria))
+plo2 <- plo2 %>% summarise(Met = mean(Met.UND == "Met"), n = n_distinct(UserId))
+```
+
+
+```{r}
+plo3 <- sig %>% filter(str_detect(Criteria, "PLO 3"))
+levels(factor(plo3$Criteria))
+```
+```{r}
+plo4 <- sig %>% filter(str_detect(Criteria, "PLO 4"))
+levels(factor(plo4$Criteria))
+```
+```{r}
+plo5 <- sig %>% filter(str_detect(Criteria, "PLO 5"))
+levels(factor(plo5$Criteria))
+plo5 <- plo5 %>% summarise(Met = mean(Met.UND == "Met"), n = n_distinct(UserId))
+plo5
+```
+
+```{r}
+plo6 <- sig %>% filter(str_detect(Criteria, "PLO6"))
+levels(factor(plo6$Criteria))
+plo6 <- plo6 %>% summarise(Met = mean(Met.UND == "Met"), n = n_distinct(UserId))
+plo6
+```
+
+```{r}
+plo7 <- sig %>% filter(str_detect(Criteria, "PLO7"))
+levels(factor(plo7$Criteria))
+```
+
+```{r}
+plo8 <- sig %>% filter(str_detect(Criteria, "PLO 8"))
+levels(factor(plo8$Criteria))
+```
+
+```{r}
+plo9 <- sig %>% filter(str_detect(Criteria, "PLO 9"))
+levels(factor(plo9$Criteria))
+plo9 <- plo9 %>% summarise(Met = mean(Met.UND == "Met"), n = n_distinct(UserId))
+plo9
+```
+
+```{r}
+res <- bind_rows(plo1, plo2, plo5, plo6, plo9)
+write_csv(res, "out/mkt_internal.csv")
+```
+
+# FIN
+
+Chris passed the data to Ed directly. It's efficient, given that he was the only one having taught that class. I'll still need to sort out the rubrics though.
+
+
+

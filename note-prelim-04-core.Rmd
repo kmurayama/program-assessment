@@ -255,7 +255,7 @@ sdf <- mdf %>% mutate(
   Major = str_replace_all(Major, "Interdisciplinary Studies in Business and Commerce", "General Business"),
   Major = str_replace_all(Major, "Management Information Systems", "MIS"),
   Major = str_replace_all(Major, "Human Resources Management", "HRM"),
-  Major = str_replace_all(Major, "Integrated Global Business", "General Business"),
+  Major = str_replace_all(Major, "Integrated Global Business", "IGB"),
   Major = str_replace_all(Major, "Other", "General Business")
 )
 
