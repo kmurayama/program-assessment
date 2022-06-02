@@ -18,3 +18,20 @@ Wrap up the notes. I wrote casually here and there, having had some troubles re-
 
 1. Extract the code for data handling into independent R scripts.
 2. Format the report notes into a report document.
+
+# 5/17/2022
+
+Checking the survey for missing entries.
+
+It appears that I didn't really update the git database for 2021. Just merged into the master branch and pushed, but files are not sorted out or documented here.
+
+
+# 5/24/2022
+
+I want to check the new data obtained yesterday, but I don't remember how generic the scripts under /R are. Ideally, I want some scripts to load any of AY19, 20, or 21 with those scripts.
+
+1. Copy some scripts to load the new data in a notebook, test the data.
+2. Later, check the scripts for the old data. Format the input data as needed.
+
+By the way, we could not retrieve several instances. A few are bad entries such as using PennWest. Others are due to the system errors during the semester. Some rubrics data turned out to be inaccessible. There was an issue with the rubrics during the semester and they did not record outcomes (e.g., Beth's BUS 499).
+

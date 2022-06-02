@@ -1,0 +1,63 @@
+---
+title: "Test AY21 data"
+output: html_notebook
+---
+
+# Introduction
+
+The data format should be the same as last year (AY20). Let's verify the format and the data completeness.
+Notes from last year are a bit of mess. For now, let's copy some scripts and focus on data check. Later, I can have some updates to the scripts (and source data format).
+
+# Import Data
+
+```{r}
+library(tidyverse)
+library(readxl)
+rootpath <- "C:\\Users\\HP\\California University of Pennsylvania\\"
+datapath <- paste0(rootpath, "ACBSP data reporting - Documents\\Data\\")
+path <- paste0(datapath, "Internal Direct Assessment\\")
+fn <- "RubricsAY21.xlsx"
+rubrics <- read_xlsx(paste0(path, fn), "rubrics")
+  # mutate(across(c(RubricId:Name, LevelAchieved), factor),
+  #        IsScoreOverridden = (IsScoreOverridden == "True"))
+fn <- "SurveyAY21.xlsx"
+survey <- read_xlsx(paste0(path, fn))
+
+head(rubrics)
+dim(rubrics)
+head(survey)
+```
+
+The first impression is not bad. Let's check the rubric ID match.
+
+```{r}
+nlevels(factor(survey$RubricId))
+nlevels(factor(rubrics$RubricId))
+```
+
+Some rubrics are not found the retrieved data.
+
+```{r}
+x <- levels(factor(survey$RubricId))
+y <- levels(factor(rubrics$RubricId))
+z <- x[!(x %in% y)]
+```
+
+```{r}
+survey %>% filter(RubricId %in% z)
+```
+
+Okay, some of no-rubric cases are picked up. The situation is not as bad.
+
+List up the entries that are missing in the rubric data.
+
+```{r}
+missing <- survey %>% filter(RubricId %in% z, Rubric == "Yes") %>%
+  select(Email, Name1, Name2, Section, ou, RubricId, URL)
+missing
+# write.csv(missing, file = "missing.csv")
+```
+
+Let's ask Jon about them. Several of them are rather unlikely.
+
+
