@@ -35,3 +35,12 @@ I want to check the new data obtained yesterday, but I don't remember how generi
 
 By the way, we could not retrieve several instances. A few are bad entries such as using PennWest. Others are due to the system errors during the semester. Some rubrics data turned out to be inaccessible. There was an issue with the rubrics during the semester and they did not record outcomes (e.g., Beth's BUS 499).
 
+# 6/2/2022
+
+Codes from AY2020 are quite messy. I cannot tell right away what to do to reproduce AY19 and AY20 results. However, at least, I documented the process in notebooks. I can trace them carefully to learn about the set of scripts used.
+
+To take advantage of the notebook, I need to have a better organization that I can *keep* using over multiple years. Perhaps I can index by year?
+
+Move all the notebook from 2020 into an archive folder. Because the data source files are not standardized, it is hard to keep consistent procedures. As I process the new data (AY2021), I can re-examine AY19 and AY20 scripts. That said, I want to preserve the codes and their outcomes I had in 2021. Archive all including the output html files to an external folder.
+
+
