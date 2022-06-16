@@ -59,7 +59,7 @@ Let's establish the column names:
 - End: End time of the survey
 - Email: Email of the person who filled the survey
 - Surveyed: Name of the person who filled the survey
-- Name: Name of the instructor (usually the same as surveyed)
+- Instructor: Name of the instructor (usually the same as surveyed)
 - Semester: Semester of the course
 - Year: Calender year of the course
 - AY: Academic year of the course
@@ -81,7 +81,7 @@ For the new survey, this is usually an iterative process. For instance, if a sur
 
 The end result can be saved as a csv file, avoiding special letters. Name each as `survey_ay#dd.csv`.
 
-AY19 survey:
+### AY19 survey
 
 ```{r}
 # Not run
@@ -91,46 +91,103 @@ qs <- names(survey)
 nms <- c("ID" = "ID",
          "Drop" = "Drop",
          "Start ti" = "Start",
-         "Completi" = "Complete", 
+         "Completi" = "End", 
          "Email" = "Email",
-         "Name" = "Instructor",
-         "In which" = "Semester",
+         "Name" = "Surveyed",
+         "In which" = "SemesterYear",
          "Course A" = "Course.Section.Original",
          "Course" = "Course",
          "Section" = "Section",
          "What is " = "Assessment.Original",
-         "Assessme" = "Assessment",
+         "Assessme" = "AssessmentName",
          "Follow u" = "Follow up",
          "I graded" = "Rubric",
          "Copy and" = "URL",
          "Analysis" = "Analysis.Rubric",
          "Action f" = "Action.Rubric",
          "What is " = "PLO.Original",
-         "PLO" = "PLO",
+         "PLO" = "ObjectiveName",
          "What is " = "n.original",
-         "n" = "n",
+         "n" = "TotalN",
          "If this " = "np.original",
-         "np" = "np",
+         "np" = "MetN",
          "Analysis" = "Analysis.Non.Rubric",
          "Action f" = "Action.Non.Rubric")
 names(survey) <- nms
+# Drop duplicates
 id.drop <- c(22, 66, 65, 61, 62, 114, 37, 64, 63)
 survey <- survey %>% filter(!ID %in% id.drop)
+# Drop answers by mistake
 survey <- survey[!survey$Drop, ]
-write_csv(survey, file = paste0(path, "survey_ay19.csv"))
+# Trim columns & Check name matches
+survey19 <- survey %>% select(ID, Start, End, Email, Surveyed, SemesterYear, Course, Section, AssessmentName, Rubric, URL, Analysis.Rubric, Action.Rubric, ObjectiveName, TotalN, MetN, Analysis.Non.Rubric, Action.Non.Rubric) %>% arrange(ID)
+# Fix errors: Analysis both in Rubric and Non Rubric
+idx <- !is.na(survey19$Analysis.Rubric) & !is.na(survey19$Analysis.Non.Rubric)
+survey19 <- survey19 %>% mutate(
+  Analysis = case_when(
+    Rubric == "Yes" ~ Analysis.Rubric,
+    Rubric == "No" ~ Analysis.Non.Rubric,
+    TRUE ~ ""),
+  Action = case_when(
+    Rubric == "Yes" ~ Action.Rubric,
+    Rubric == "No" ~ Action.Non.Rubric,
+    TRUE ~ ""))
+# survey19[idx, c("Rubric", "Analysis", "Analysis.Rubric", "Analysis.Non.Rubric")]
+survey19 <- survey19 %>% select(!ends_with(".Rubric"))
+
+# Split and add columns
+survey19 <- survey19 %>%
+  separate(SemesterYear, c("Semester", "Year"), " ") %>% 
+  mutate(Course = str_replace(Course, " ", "-"),
+         Section = str_replace_all(Section, " ", "-"),
+         AY = 2019,
+         Name = Surveyed,
+         Program = str_sub(Course, 1, 3))
+# Trim columns & Check name matches
+survey19 <- survey19 %>%
+  select(ID, Start, End, Email, Surveyed, Name, Semester, Year, AY,
+         Program, Course, Section, Rubric, URL, AssessmentName, ObjectiveName,
+         TotalN, MetN, Analysis, Action) %>% arrange(ID)
+
+write_csv(survey19, file = paste0(path, "survey_ay19.csv"))
 ```
 
-AY20 survey:
+### AY20 survey
 
 ```{r}
 fn <- "Rubrics_07302021.xlsx"
 survey <- read_xlsx(paste0(path, fn), "survey")
-colnames(survey) <- c("ID", "Exclude", "Start", "Completion", "Email", "Survey Name", "Semester", "Course and Section Original", "Course and Section", "Assessment Name Original", "Assessment Name", "Rubric Grade Original", "Rubric Grade", "URL Original", "URL", "Analysis Rubric", "Action Rubric", "LO", "n", "s", "Analysis Non Rubric", "Action Non Rubric")
-survey <- survey %>% mutate(across(c(n, s), as.numeric))
+colnames(survey) <- c("ID", "Exclude", "Start", "End", "Email", "Surveyed", "Semester", "Course and Section Original", "Course and Section", "Assessment Name Original", "Assessment Name", "Rubric Grade Original", "Rubric", "URL Original", "URL", "Analysis Rubric", "Action Rubric", "ObjectiveName", "TotalN", "MetN", "Analysis Non Rubric", "Action Non Rubric")
+survey20 <- survey %>% mutate(across(c(TotalN, MetN), as.numeric))
+
+# Merge analysis and action colmuns
+survey20 <- survey20 %>% mutate(
+  Analysis = case_when(
+    Rubric == "Yes" ~ `Analysis Rubric`,
+    Rubric == "No" ~ `Analysis Non Rubric`,
+    TRUE ~ ""),
+  Action = case_when(
+    Rubric == "Yes" ~ `Action Rubric`,
+    Rubric == "No" ~ `Action Non Rubric`,
+    TRUE ~ ""))
+
 # Split course and section
-courses <- str_split(survey$`Course and Section`, "-", simplify = TRUE)
-survey <- bind_cols(survey, Course = courses[, 1], Section = courses[, 2])
-write_csv(survey, file = paste0(path, "survey_ay20.csv"))
+survey20 <- survey20 %>% mutate(
+  Program = str_sub(`Course and Section`, 1, 3),
+  Course = paste0(Program, "-", str_sub(`Course and Section`, 4, 6)),
+  Section = paste0(Course, "-", str_sub(`Course and Section`, 8, 10)),
+  AY = 2020,
+  AssessmentName = `Assessment Name`,
+  Name = Surveyed
+) %>% separate(Semester, c("Semester", "Year"), " ")
+
+# Select and check names
+survey20 <- survey20 %>%
+  select(ID, Start, End, Email, Surveyed, Name, Semester, Year, AY,
+         Program, Course, Section, Rubric, URL, AssessmentName, ObjectiveName,
+         TotalN, MetN, Analysis, Action) %>% arrange(ID)
+  
+write_csv(survey20, file = paste0(path, "survey_ay20.csv"))
 ```
 
 AY21 Survey:
@@ -143,21 +200,19 @@ fns <- grep("Assessment Survey", fns, value=TRUE)
 rawdfs <- lapply(paste0(rootdir, fns), read_excel)
 # plandf <- read_excel(paste0(rootdir, "1. Assessment Plan at a Glance Copied.xlsx"))
 
-# Clean data
 cleandf <- function(mdf, semester){
   mdf <- mdf %>% select(!starts_with(c("Points", "Feedback")))
   mdf <- mdf %>% select(!c("Total points", "Quiz feedback"))
   # Check for expected column number
   ncol(mdf) == 16
   # If pass, then rename all
-  mdfnames <- c("ID", "Time1", "Time2", "Email", "Name", "Program", "Number", "OnlySection", "Rubric", "URL",
-                "AssessmentName", "ObjectiveName", "TotalN", "SatisfactoryN", "Analysis", "Action")
+  mdfnames <- c("ID", "Start", "End", "Email", "Surveyed", "Program", "Number",
+                "OnlySection", "Rubric", "URL", "AssessmentName",
+                "ObjectiveName", "TotalN", "MetN", "Analysis", "Action")
   colnames(mdf) <- mdfnames
   mdf <- mdf %>% 
-    separate(Name, c("Name1", "Name2")) %>% 
     mutate(Course = paste0(Program, "-", Number),
-           Section = paste0(Course, "-", OnlySection),
-           NameSection = paste0(Name2, "-", Section))
+           Section = paste0(Course, "-", OnlySection))
   mdf$Semester <- semester
   mdf
 }
@@ -166,29 +221,20 @@ surveys <- list()
 surveys[[1]] <- cleandf(rawdfs[[1]], "Fall 2021")
 surveys[[2]] <- cleandf(rawdfs[[2]], "Summer 2021")
 surveys[[3]] <- cleandf(rawdfs[[3]], "Spring 2022")
+survey21 <- bind_rows(surveys)
 
-# Check URL validity
-survey <- bind_rows(surveys)
-survey$rubricId <- str_extract_all(survey$URL, "rubricId=[0-9]{6}", simplify=TRUE)
-survey$ou <- str_extract_all(survey$URL, "ou=[0-9]{7}", simplify=TRUE)
+survey21 <- survey21 %>% mutate(
+  AY = 2021,
+  Name = Surveyed
+) %>% separate(Semester, c("Semester", "Year"), " ")
 
-# # One error (May 20th retrieval)
-# survey[41, ]
-# survey[41, c("Name2", "Section", "Semester", "rubricId", "ou")]
-# survey[39:45, c("Name2", "Section", "Semester", "rubricId", "ou")]
-# # Another entry covered.
-
-# # Extract rubric ID... Old code, too much assumption about the order?
-# # ToDo: Fix and relfect on the code R/int_read.R
-# survey$RubricId <- factor(str_extract_all(survey$rubricId, "[0-9]{6}", simplify=TRUE))
-# survey[, c("RubricId", "rubricId")]
-# 
-# # Request
-# x <- as.numeric(levels(survey$RubricId))
-# # write.csv(x, file = "rubricid.csv", row.names = FALSE)
-
-# Export the survey for the permanent storage
-write.csv(survey, file = paste0(path, "survey_ay21.csv"), row.names = FALSE)
+# Select and check names
+survey21 <- survey21 %>%
+  select(ID, Start, End, Email, Surveyed, Name, Semester, Year, AY,
+         Program, Course, Section, Rubric, URL, AssessmentName, ObjectiveName,
+         TotalN, MetN, Analysis, Action) %>% arrange(ID)
+  
+write_csv(survey21, file = paste0(path, "survey_ay21.csv"))
 ```
 
 
