@@ -1,0 +1,320 @@
+---
+title: "Process D2L rubric outcome data"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  word_document: default
+---
+
+```{r init}
+library(tidyverse)
+library(readxl)
+rootpath <- "C:\\Users\\HP\\California University of Pennsylvania"
+datapath <- paste0(rootpath, "\\ACBSP data reporting - Documents\\Data\\")
+
+path <- paste0(datapath, "Internal Direct Assessment\\")
+```
+
+
+# Introduction
+
+Data import procedures for AY2019 and 2020 are inconsistent and confusing.
+In this memo, I would like to explore them and find a way to unify them. As a base framework, I plan to make a set of "raw" data files that can be further processed automatically. Namely, I will have:
+
+- `Survey data` for rubric information such as instructor name, rubric ID, and comments;
+- `Rubric outcome data` for outcomes of students' learning assessment drawn from the D2L database; and
+- `Master data` for the historical data of students' learning assessment across years.
+
+In order to make the analysis reproducible and traceable, I would like to start from the data as raw as possible. On the one hand, `Rubric outcome data` is suited for correction by scripts because it is produced systematically. On the other hand, `Survey data` are full of human errors and small. A manual pre-processing is beneficial. Lastly, the `Master data` are rarely subject to changes and hence can be used as a reference point for the naming convention and selection.
+
+Therefore, I would like to establish the way to process those data manually or programmatically, depending on the nature of data set, and document such procedures.
+In the following, ... (outline later).
+
+
+# Source of Incocistencies
+
+First and most importantly, inconsistencies can be due to the change in D2L versions and/or implementations, columns available to the analysis may change year by year. For instance, between AY2019 and AY2020, there was a major version change in D2L system that involved how the database is structured. The new structure was explored by the analyst and admin, resulting in the new set of columns to be drawn from the database.
+
+Second, naming convention may differ as a result of non-standardized procedures. As mentioned above, some data analyses and preparations are exploratory and unplanned. Moreover, it is iterative with a number of trials and errors. As a result, inconsistent names and definitions are introduced in the process. After the two iterations (AY2020 and AY2021), it is probably time to set a unified framework to impose in the future.
+
+(What type of inconsistencies? Addressing ones in contents as well?)
+
+# Data Sources
+
+All the data for the *internal direct* assessments are stored under `ACBSP data reporting - Documents\Data\Internal Direct Assessment` for now.
+
+# Standardize Columns
+
+- `Assessment Survey Responses.xlsx` for AY20. Quite messy. Renames and such in `R/int_munge.R`
+- `Rubrics_07302021.xlsx` has a tab `survey` for AY21.
+- `SurveyAY21.xlsx` for AY22.
+
+## Column Names
+
+Let's establish the column names:
+
+- ID: Internal ID
+- Start: Start time of the survey
+- End: End time of the survey
+- Email: Email of the person who filled the survey
+- Surveyed: Name of the person who filled the survey
+- Instructor: Name of the instructor (usually the same as surveyed)
+- Semester: Semester of the course
+- Year: Calender year of the course
+- AY: Academic year of the course
+- Program: 3-letter program ID of the course (e.g., ECO)
+- Course: Course ID including the 3-digit numbers (e.g., ECO-201)
+- Section: Comprehensive ID for the implementation of the course (e.g., ECO-201-002) 
+- Rubric: Indicator variable of whether the assessment is done with rubrics or not
+- URL: URL of the rubric if applicable
+- AssessmentName: Name of the assessment as specified in the plan
+- ObjectiveName: Name of the objective as specified in the plan
+- TotalN: Total number of students (NA if rubric is used)
+- MetN: Number of students who met the criteria (NA if rubric is used)
+- Analysis: Analysis of the outcomes by the surveyed
+- Action: Action plan from the analysis by the surveyed
+
+These names can be imposed to the survey file programmatically and/or manually as a one-time procedure. Moreover, some obvious errors in data can be fixed.
+
+For the new survey, this is usually an iterative process. For instance, if a survey entry contains no usable URL, then it needs to be discarded and a new entry is requested.
+
+The end result can be saved as a csv file, avoiding special letters. Name each as `survey_ay#dd.csv`.
+
+```{r eval=FALSE}
+# Not run
+fn <- "Assessment Survey Responses.xlsx"
+survey <- read_excel(paste0(path, fn), "Edited")
+qs <- names(survey)
+nms <- c("ID" = "ID",
+         "Drop" = "Drop",
+         "Start ti" = "Start",
+         "Completi" = "End", 
+         "Email" = "Email",
+         "Name" = "Surveyed",
+         "In which" = "SemesterYear",
+         "Course A" = "Course.Section.Original",
+         "Course" = "Course",
+         "Section" = "Section",
+         "What is " = "Assessment.Original",
+         "Assessme" = "AssessmentName",
+         "Follow u" = "Follow up",
+         "I graded" = "Rubric",
+         "Copy and" = "URL",
+         "Analysis" = "Analysis.Rubric",
+         "Action f" = "Action.Rubric",
+         "What is " = "PLO.Original",
+         "PLO" = "ObjectiveName",
+         "What is " = "n.original",
+         "n" = "TotalN",
+         "If this " = "np.original",
+         "np" = "MetN",
+         "Analysis" = "Analysis.Non.Rubric",
+         "Action f" = "Action.Non.Rubric")
+names(survey) <- nms
+# Drop duplicates
+id.drop <- c(22, 66, 65, 61, 62, 114, 37, 64, 63)
+survey <- survey %>% filter(!ID %in% id.drop)
+# Drop answers by mistake
+survey <- survey[!survey$Drop, ]
+# Trim columns & Check name matches
+survey19 <- survey %>% select(ID, Start, End, Email, Surveyed, SemesterYear, Course, Section, AssessmentName, Rubric, URL, Analysis.Rubric, Action.Rubric, ObjectiveName, TotalN, MetN, Analysis.Non.Rubric, Action.Non.Rubric) %>% arrange(ID)
+# Fix errors: Analysis both in Rubric and Non Rubric
+idx <- !is.na(survey19$Analysis.Rubric) & !is.na(survey19$Analysis.Non.Rubric)
+survey19 <- survey19 %>% mutate(
+  Analysis = case_when(
+    Rubric == "Yes" ~ Analysis.Rubric,
+    Rubric == "No" ~ Analysis.Non.Rubric,
+    TRUE ~ ""),
+  Action = case_when(
+    Rubric == "Yes" ~ Action.Rubric,
+    Rubric == "No" ~ Action.Non.Rubric,
+    TRUE ~ ""))
+# survey19[idx, c("Rubric", "Analysis", "Analysis.Rubric", "Analysis.Non.Rubric")]
+survey19 <- survey19 %>% select(!ends_with(".Rubric"))
+
+# Split and add columns
+survey19 <- survey19 %>%
+  separate(SemesterYear, c("Semester", "Year"), " ") %>% 
+  mutate(Course = str_replace(Course, " ", "-"),
+         Section = str_replace_all(Section, " ", "-"),
+         AY = 2019,
+         Name = Surveyed,
+         Program = str_sub(Course, 1, 3))
+# Trim columns & Check name matches
+survey19 <- survey19 %>%
+  select(ID, Start, End, Email, Surveyed, Name, Semester, Year, AY,
+         Program, Course, Section, Rubric, URL, AssessmentName, ObjectiveName,
+         TotalN, MetN, Analysis, Action) %>% arrange(ID)
+
+write_csv(survey19, file = paste0(path, "survey_ay19.csv"))
+```
+
+```{r eval=FALSE}
+fn <- "Rubrics_07302021.xlsx"
+survey <- read_xlsx(paste0(path, fn), "survey")
+colnames(survey) <- c("ID", "Exclude", "Start", "End", "Email", "Surveyed", "Semester", "Course and Section Original", "Course and Section", "Assessment Name Original", "Assessment Name", "Rubric Grade Original", "Rubric", "URL Original", "URL", "Analysis Rubric", "Action Rubric", "ObjectiveName", "TotalN", "MetN", "Analysis Non Rubric", "Action Non Rubric")
+survey20 <- survey %>% mutate(across(c(TotalN, MetN), as.numeric))
+
+# Merge analysis and action colmuns
+survey20 <- survey20 %>% mutate(
+  Analysis = case_when(
+    Rubric == "Yes" ~ `Analysis Rubric`,
+    Rubric == "No" ~ `Analysis Non Rubric`,
+    TRUE ~ ""),
+  Action = case_when(
+    Rubric == "Yes" ~ `Action Rubric`,
+    Rubric == "No" ~ `Action Non Rubric`,
+    TRUE ~ ""))
+
+# Split course and section
+survey20 <- survey20 %>% mutate(
+  Program = str_sub(`Course and Section`, 1, 3),
+  Course = paste0(Program, "-", str_sub(`Course and Section`, 4, 6)),
+  Section = paste0(Course, "-", str_sub(`Course and Section`, 8, 10)),
+  AY = 2020,
+  AssessmentName = `Assessment Name`,
+  Name = Surveyed
+) %>% separate(Semester, c("Semester", "Year"), " ")
+
+# Select and check names
+survey20 <- survey20 %>%
+  select(ID, Start, End, Email, Surveyed, Name, Semester, Year, AY,
+         Program, Course, Section, Rubric, URL, AssessmentName, ObjectiveName,
+         TotalN, MetN, Analysis, Action) %>% arrange(ID)
+  
+write_csv(survey20, file = paste0(path, "survey_ay20.csv"))
+```
+
+```{r eval=FALSE}
+# Temporary folder
+rootdir <- "C://Users/HP/OneDrive - California University of Pennsylvania/Data/AY2021 Backup/"
+fns <- list.files(path = rootdir)
+fns <- grep("Assessment Survey", fns, value=TRUE)
+rawdfs <- lapply(paste0(rootdir, fns), read_excel)
+# plandf <- read_excel(paste0(rootdir, "1. Assessment Plan at a Glance Copied.xlsx"))
+
+cleandf <- function(mdf, semester){
+  mdf <- mdf %>% select(!starts_with(c("Points", "Feedback")))
+  mdf <- mdf %>% select(!c("Total points", "Quiz feedback"))
+  # Check for expected column number
+  ncol(mdf) == 16
+  # If pass, then rename all
+  mdfnames <- c("ID", "Start", "End", "Email", "Surveyed", "Program", "Number",
+                "OnlySection", "Rubric", "URL", "AssessmentName",
+                "ObjectiveName", "TotalN", "MetN", "Analysis", "Action")
+  colnames(mdf) <- mdfnames
+  mdf <- mdf %>% 
+    mutate(Course = paste0(Program, "-", Number),
+           Section = paste0(Course, "-", OnlySection))
+  mdf$Semester <- semester
+  mdf
+}
+
+surveys <- list()
+surveys[[1]] <- cleandf(rawdfs[[1]], "Fall 2021")
+surveys[[2]] <- cleandf(rawdfs[[2]], "Summer 2021")
+surveys[[3]] <- cleandf(rawdfs[[3]], "Spring 2022")
+survey21 <- bind_rows(surveys)
+
+survey21 <- survey21 %>% mutate(
+  AY = 2021,
+  Name = Surveyed
+) %>% separate(Semester, c("Semester", "Year"), " ")
+
+# Select and check names
+survey21 <- survey21 %>%
+  select(ID, Start, End, Email, Surveyed, Name, Semester, Year, AY,
+         Program, Course, Section, Rubric, URL, AssessmentName, ObjectiveName,
+         TotalN, MetN, Analysis, Action) %>% arrange(ID)
+  
+write_csv(survey21, file = paste0(path, "survey_ay21.csv"))
+```
+
+## Entry Names
+
+For AY21 survey, I see some issues.
+As usual, updates were not shared with me. The correspondence between the course IDs, assignment names, and objectives listed in the plan are not matching with the existing records.
+
+Apart from the lack of communication, I shall accept the fact that the objective-class-assignment correspondence can change over time. Use the objective ID alone as the identifier, while keeping the implementation part as a side note.
+
+In the future, it will be helpful to *enforce* the course-objective connection in advance (e.g., multiple choice). Clearly, I'll need a better communication about the assessment plan. Also, multiple objectives can be attributed into one assignment since each can only use a part of the rubric. (For the past data, I simply used course ID as  an identifier, given that the correspondence is clear and accessible.)
+
+Likewise, the variations in the assignment name are big. Some just named them "Signature Assignment" without specification. The plan document does not contain the assignment name, so I need to use the database table. Some entries in the database need updates.
+
+## Restart
+
+This approach is not quite helpful. It's tempting to have the survey part correct and solid, but after all it contains many errors and missing values. Also, the duplicates in the entries make it harder to keep track.
+
+Another approach is that of AY19 and AY20. Modify the data iteratively as the data are explored. This time, however, I can construct a table of objective-course-assignment correspondence.
+
+## Rubric outcomes
+
+- `Rubrics.xlsx` for AY20.
+- `Rubrics_07302021.xlsx` tab `rubrics` for AY21.
+- `RubricsAY21.xlsx` for AY22.
+
+Those are highly standardized. Names can be changed to be uniform programmatically. Perhaps it is better to save them as csv file with a shorter name `survey##`.
+
+```{r}
+rubrics19 <- read_excel(paste0(path, "Rubrics.xlsx"))
+head(rubrics19)
+rubrics20 <- read_excel(paste0(path, "Rubrics_07302021.xlsx"), sheet = "rubrics")
+head(rubrics20)
+rubrics21 <- read_excel(paste0(path, "RubricsAY21.xlsx"))
+head(rubrics21)
+
+sapply(list(rubrics19, rubrics20, rubrics21), names)
+```
+
+Select and rename:
+
+```{r}
+rubrics19 <- rubrics19 %>% rename(RowName = Name)
+rubrics20 <- rubrics20 %>%
+  select(RubricId, UserId,
+         RowName = `Rubric Object Criteria 6-Name`,
+         Score = `Rubric Assessment Criteria 6-Score`,
+         LevelAchieved = `Rubric Object Levels 6-Name`,
+         Feedback,
+         RubricName = Name, RowGroup = GroupName, Code)
+rubrics21 <- rubrics21 %>%
+  select(RubricId, UserId,
+         RowName = `Rubric Object Criteria 6-Name`,
+         Score = `Rubric Assessment Criteria 6-Score`,
+         LevelAchieved = `Rubric Object Levels 6-Name`,
+         Feedback,
+         RubricName = Name, RowGroup = GroupName, Code)
+```
+```{r eval=FALSE}
+# Not run
+write_csv(rubrics19, paste0(path, "rubrics19.csv"))
+write_csv(rubrics20, paste0(path, "rubrics20.csv"))
+write_csv(rubrics21, paste0(path, "rubrics21.csv"))
+```
+
+
+## Misc
+
+Irregular inputs include
+
+- Mapping keys to identify the corresponding rubric rows
+- MBA comprehensive exam outcomes were used for MBA assessment in AY19 and 20
+- Files used for testing (not identified)
+
+I can leave them for now. When the school fully transfers to the new system, I can clean them up.
+
+## Summary
+
+In the future, I'll need a simple script to standardize the column names according to the change in specifications. I can form stand-alone scripts for AY19-21 from above examples.
+
+For the current edit, I shall continue with the contents of those data sets. As noted earlier, I shall use the same method as AY19 and 20 to clean the survey data, while developing the look-up table for the objective-assessment combinations.
+
+Meanwhile, fixes to the rubric outcome data shall be done programmatically as before. This step should be documented separately.
+
+
+# Standardize Contents
+
+
+# Summary
