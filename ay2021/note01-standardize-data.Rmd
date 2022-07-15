@@ -11,10 +11,10 @@ output:
 ```{r init}
 library(tidyverse)
 library(readxl)
-rootpath <- "C:\\Users\\HP\\California University of Pennsylvania"
-datapath <- paste0(rootpath, "\\ACBSP data reporting - Documents\\Data\\")
+rootpath <- "C:\\Users\\HP\\OneDrive - Pennsylvania Western University"
+datapath <- paste0(rootpath, "\\Assessment\\Backup\\Data")
 
-path <- paste0(datapath, "Internal Direct Assessment\\")
+path <- paste0(datapath, "\\Internal Direct Assessment\\")
 ```
 
 
