@@ -1,0 +1,555 @@
+---
+title: "Read the AY21 data"
+output: html_notebook
+---
+
+```{r init}
+library(tidyverse)
+library(readxl)
+options(max.print = 100000)
+rootpath <- "C:\\Users\\HP\\OneDrive - Pennsylvania Western University"
+datapath <- paste0(rootpath, "\\Assessment\\Backup\\Data")
+
+path <- paste0(datapath, "\\Internal Direct Assessment\\")
+```
+
+# Introduction
+
+In Note 01, the rubric and survey data sets are standardized in the column names for AY19-21. Now, read the data into R for AY21 to further process the data. Note that the CSV files created in Note 01 are just the base files. At the moment, the manually-edited version of CSV files are available for AY21.
+
+# Data
+
+As organized in Note 01, the following list shows the basic data files:
+
+- `Survey data` for rubric information such as instructor name, rubric ID, and comments;
+- `Rubric outcome data` for achievements of students' learning assessment drawn from the D2L database; and
+- `Master data` for the historical data of students' learning assessment across years.
+
+Load the files for AY21.
+
+```{r}
+outcome_raw <- read_csv(paste0(path, "rubrics21.csv"), show_col_types = FALSE)
+survey21 <- read_csv(paste0(path, "survey_ay21.csv"), show_col_types = FALSE)
+```
+
+Separate non-rubric assessments out.
+
+```{r}
+survey21nr <- survey21 %>% filter(Rubric == "No")
+survey21r <- survey21 %>% filter(Rubric == "Yes")
+```
+
+
+```{r}
+survey21r <- survey21r %>% select(-c(ID:End, Rubric, ObjectiveName:MetN))
+```
+
+
+There are lots of inconsistencies which are evident in the number of levels in `LevelAchieved`.
+
+```{r}
+nlevels(factor(outcome_raw$RubricId))
+nlevels(factor(outcome_raw$RowName))
+nlevels(factor(outcome_raw$LevelAchieved))
+nlevels(factor(outcome_raw$RubricName))
+```
+
+Fixing inconsistencies in the data manually at once is too messy. As before, merge the data with survey so that I would know which rubric belongs to what course, then standardize them by course. I shall prioritize the summative assessments.
+
+Extract the `RubricId` in the survey and merge with the rubrics data.
+
+```{r}
+# Extract IDs
+survey21r$RubricId <-
+  str_extract_all(survey21r$URL, "rubricId=[0-9]{6}", simplify=TRUE)
+survey21r$OU <-
+  str_extract_all(survey21r$URL, "ou=[0-9]{7}", simplify=TRUE)
+# Further clean
+survey21r$RubricId <-
+  str_extract_all(survey21r$RubricId, "[0-9]{6}", simplify=TRUE)
+survey21r$OU <-
+  str_extract_all(survey21r$OU, "[0-9]{7}", simplify=TRUE)
+# Sort out the column type
+survey21r <- survey21r %>% select(-URL) %>%
+  mutate(RubricId = as.numeric(RubricId),
+         OU = as.numeric(OU))
+# Then merge the dataframes
+outcome <- left_join(outcome_raw, survey21r, by = "RubricId")
+# Clear
+rm(outcome_raw, survey21r, survey21)
+rm(datapath, path, rootpath)
+```
+
+
+# Cleaning
+
+## Overview and Plan
+
+First, the names of the assessments vary. For instance, BUS-499:
+
+```{r}
+sdf <- outcome %>% filter(Course == "BUS-499")
+levels(factor(sdf$AssessmentName))
+```
+
+Need to sort this first.
+
+### Rubric Rows
+
+Rubric row names have some variability. For instance, in BUS-499:
+
+```{r}
+head(levels(factor(sdf$RowName)), 20)
+```
+
+
+In the past, I used the "keys" to pick up the relevant rows, while leaving the inconsistencies. This process has been rather confusing, leaving some manual entries unchecked.
+
+An alternative is to recode those entries into factors, then save as a part of the source data. For instance, both the following two can be labelled as "PLO6d":
+
+- "PLO6d: Consistency \r\r\n10%"
+- "PLO6d: Consistency\r\r\n10%" 
+
+I cannot avoid using some hard-coded keys, but it has an advantage of grouping "unnamed" entries such as formative assessments. So, here's the task 1. Let's recode rubric rows.
+
+
+### Level Achieved
+
+Next, the `LevelAchieved` has variations as well. There's a pattern in them, so I should be able to use the codes from the past.
+
+```{r}
+nlevels(factor(outcome$LevelAchieved))
+```
+
+Task 2 is to standardize the `LevelAchieved`.
+
+
+### Plan
+
+I talked with Beth and agreed that we can set our standard differently this time because
+
+- We had some technical difficulties, partly from the system integration
+- ACBSP only requires the core and "examples" of majors this time
+
+So, this year, I will just report the core from BUS 499 and some illustrative cases for departments. The plan for AY22 needs to be discussed further, but the core idea is that this will be a transitional year where the comparison of assessment achievements will become unfeasible. We need to restart the assessments.
+
+In the following, complete the two goals only for BUS 499.
+
+- Standardize the assignment names
+- Recode rubric rows
+- Standardize level achieved
+
+For each step, use Beth's as a refernce.
+
+
+## Standardize Assessment Names
+
+Use Beth's as a reference.
+
+```{r}
+full <- outcome %>% filter(Course == "BUS-499")
+ref <- outcome %>% filter(Course == "BUS-499" & Name == "Elizabeth Jones")
+```
+
+
+First check the assignment names:
+
+```{r}
+levels(factor(ref$AssessmentName))
+levels(factor(full$AssessmentName))
+```
+
+Those are supposed to be fixed in the survey, though. Update the pre-process later.
+
+However, need to confirm some.
+
+```{r}
+# table(ref$AssessmentName, substr(ref$RowName, 1, 10))
+
+ref %>% filter(grepl("Company", AssessmentName)) %>% group_by(AssessmentName) %>% count(substr(RowName, 1, 10))
+
+ref %>% filter(grepl("Development", AssessmentName)) %>% group_by(AssessmentName) %>% count(substr(RowName, 1, 10))
+
+ref %>% filter(grepl("GoVenture", AssessmentName)) %>% group_by(AssessmentName) %>% count(substr(RowName, 1, 10))
+```
+
+
+Withing the reference data, there are 6 names.
+
+- "Annotated bibliography",
+- "Company Profile",
+- "Reflection and Development plan" = "Development plan",
+- "Ethics case paper" = "Ethics case",
+- "GoVenture CEO after-action review"
+- "GoVenture AAR"
+
+Now test standardizing them.
+
+```{r}
+pattern <- c(
+  "Reflection and Development plan" = "Development plan",
+  "Ethics case paper" = "Ethics case"
+)
+x <- levels(factor(ref$AssessmentName))
+levels(factor(str_replace_all(x, pattern)))
+```
+
+Now check the full data:
+
+```{r}
+full %>% filter(grepl("AAR", AssessmentName)) %>% group_by(AssessmentName) %>% count(substr(RowName, 1, 10))
+
+full %>% filter(grepl("CEO", AssessmentName)) %>% group_by(AssessmentName) %>% count(substr(RowName, 1, 10))
+
+full %>% filter(grepl("Company", AssessmentName) | grepl("Strategic", AssessmentName)) %>% group_by(AssessmentName) %>% count(substr(RowName, 1, 10))
+```
+
+
+
+- "Annotated bibliography",
+- "Company Profile" = "Strategic Analysis Portfolio",
+- "Reflection and Development plan" = "Development plan",
+- "Ethics case paper" = "Ethics case", "Ethics Case paper" = "Ethics case",
+- "GoVenture CEO after-action review"
+- "AAR" = "GoVenture AAR", "Simulation AAR" = "GoVenture AAR",
+- "Strategic Analysis Portfolio" = "Company Profile"
+
+
+
+Test the pattern.
+
+```{r}
+pattern <- c(
+  "Reflection and Development plan" = "Development plan",
+  "Ethics case paper" = "Ethics case", "Ethics Case paper" = "Ethics case", "Ethics Case" = "Ethics case",
+  "^AAR$" = "GoVenture AAR", "Simulation AAR" = "GoVenture AAR",
+  "Strategic Analysis Portfolio" = "Company Profile"
+  )
+
+x <- levels(factor(full$AssessmentName))
+levels(factor(str_replace_all(x, pattern)))
+```
+
+```{r}
+full <- full %>% mutate(AssessmentName = str_replace_all(AssessmentName, pattern))
+levels(factor(full$AssessmentName))
+```
+
+Redefine the reference data.
+
+```{r}
+ref <- full %>% filter(Name == "Elizabeth Jones")
+```
+
+
+
+### Annotated Bibliography
+
+Check the rubric rows of the reference, test extraction, then test with the "full" data.
+
+```{r}
+aname <- "Annotated bibliography"
+test <- ref %>% filter(AssessmentName == aname)
+levels(factor(test$RowName))
+```
+```{r}
+pattern <- "PLO(\\d)[a-z]?"
+test %>% transmute(LO = str_extract(RowName, pattern))
+```
+
+Check with the "full" data.
+
+```{r}
+test <- full %>% filter(AssessmentName == aname)
+levels(factor(test$RowName))
+str_extract(levels(factor(test$RowName)), pattern)
+```
+
+Looks alright. I can extract with the string above.
+
+
+
+### Company Profile
+
+Check the rubric rows of the reference, test extraction, then test with the "full" data.
+
+```{r}
+aname <- "Company Profile"
+test <- ref %>% filter(AssessmentName == aname)
+levels(factor(test$RowName))
+```
+```{r}
+pattern <- "PLO(\\d)[a-z]?"
+test %>% transmute(LO = str_extract(RowName, pattern))
+```
+
+Check with the "full" data.
+
+Some inconsistencies in the strings but contents match.
+
+```{r}
+test <- full %>% filter(AssessmentName == aname)
+levels(factor(test$RowName))
+str_extract(levels(factor(test$RowName)), pattern)
+```
+
+Looks alright. I can extract with the string above.
+
+
+
+### Development plan
+
+Check the rubric rows of the reference, test extraction, then test with the "full" data.
+
+```{r}
+aname <- "Development plan"
+test <- ref %>% filter(AssessmentName == aname)
+levels(factor(test$RowName))
+```
+
+No coding?
+
+
+
+### Ethics case
+
+Check the rubric rows of the reference, test extraction, then test with the "full" data.
+
+```{r}
+aname <- "Ethics case"
+test <- ref %>% filter(AssessmentName == aname)
+levels(factor(test$RowName))
+```
+```{r}
+pattern <- "PLO(\\d)[a-z]?"
+test %>% transmute(LO = str_extract(RowName, pattern))
+```
+
+Check with the "full" data.
+
+```{r}
+test <- full %>% filter(AssessmentName == aname)
+levels(factor(test$RowName))
+```
+
+Typo "PL" omitting "O".
+
+```{r}
+pattern <- "PL(O)?(\\d)[a-z]?"
+str_extract(levels(factor(test$RowName)), pattern)
+```
+
+### Final Reflection
+
+Not found in Beth's but has PLO?
+
+
+```{r}
+aname <- "Final Reflection"
+test <- full %>% filter(AssessmentName == aname)
+
+levels(factor(test$RowName))
+```
+
+
+### GoVenture AAR
+
+Check the rubric rows of the reference, test extraction, then test with the "full" data.
+
+```{r}
+aname <- "GoVenture AAR"
+test <- ref %>% filter(AssessmentName == aname)
+levels(factor(test$RowName))
+```
+
+```{r}
+pattern <- "PLO(\\d)[a-z]?"
+test %>% transmute(LO = str_extract(RowName, pattern))
+```
+
+Check with the "full" data.
+
+Some inconsistencies in the strings but contents match.
+
+```{r}
+test <- full %>% filter(AssessmentName == aname)
+levels(factor(test$RowName))
+str_extract(levels(factor(test$RowName)), pattern)
+```
+
+
+### GoVenture CEO... ?
+
+Need to check
+
+
+
+## Standardize Level Achieved
+
+Apply the standardization developed.
+
+```{r}
+# Test
+pattern <- "(P?)L(O?)(\\d)[a-z]?"
+
+x <- levels(factor(full$RowName))
+str_sub(x, 1, 10)
+str_extract(x, pattern)
+```
+
+```{r}
+full <- full %>% mutate(LO = str_extract(RowName, pattern))
+```
+
+
+### Test and Fix
+
+Quick review:
+
+- It can be separated into the attributes and achievements.
+- Unsatisfactory (0), Developing (65), Basic (75), Proficient (85), Advanced (100)
+- Unacceptable (0), Basic (75), Good (85), Excellent (100)
+- Digits are necessary but not sufficient
+- Typos exist (e.g., Devloping)
+
+```{r}
+x <- levels(factor(full$LevelAchieved))
+x
+# full %>% group_by(Row = str_sub(RowName, 1, 10)) %>% count(LevelAchieved)
+```
+
+```{r}
+achievements <- full %>% filter(RowName != "Major" & RowName != "Minor" & RowName != "New Criterion")
+attributes <- full %>% filter(RowName == "Major" | RowName == "Minor" | RowName == "New Criterion")
+
+levels(factor(achievements$LevelAchieved))
+levels(factor(attributes$LevelAchieved))
+```
+
+Then, it is easy to extract achievement levels.
+
+```{r}
+# Test
+x <- levels(factor(achievements$LevelAchieved))
+str_extract(x, "\\d{1,3}")
+
+# Apply
+achievements <- achievements %>% mutate(Level = str_extract(LevelAchieved, "\\d{1,3}"))
+```
+
+Clean up the attributes. It's quite messy. Instead of exact matching, I can clean incrementally.
+
+```{r}
+x <- levels(factor(attributes$LevelAchieved))
+x <- str_to_title(x)
+
+x <- str_replace(x, "Busine(s){1,3}", "Business")
+x <- str_replace(x, "\\s?\\d%", "")
+x <- str_replace(x,"(Business/)|(Forensic )|( Or Integrated Business)|( Or None)|( In Business And Commerce)", "")
+x <- str_replace(x, "Communications", "Communication")
+x <- str_replace(x, "Fin", "Finance")
+x <- str_replace(x, "Gen Bus", "General Business")
+x <- str_replace(x, fixed(" (Old Catalog)"), "")
+levels(factor(x))
+```
+
+```{r}
+x <- levels(factor(attributes$LevelAchieved))
+x <- str_to_title(x)
+
+pattern <- c(
+  "Busine(s){1,3}"= "Business",
+  "\\s?\\d%"= "",
+  "(Business/)|(Forensic )|( Or Integrated Business)|( Or None)|( In Business And Commerce)"= "",
+  "Communications"= "Communication",
+  "^Fin$"= "Finance",
+  "^Gen Bus^"= "General Business"
+  )
+
+x <- str_replace_all(x, pattern)
+x <- str_replace_all(x, fixed(" (Old Catalog)"), "")
+x
+```
+
+```{r}
+attributes <- attributes %>% mutate(
+  Attribute = str_to_sentence(LevelAchieved),
+  Attribute = str_replace_all(Attribute, pattern),
+  Attribute = str_replace_all(Attribute, fixed(" (old catalog)"), ""))
+```
+
+
+### Merge
+
+Now the achievements and attributes columns are cleaned. Since they belong to different levels, it makes sense to store them in separate columns.
+
+```{r}
+head(attributes)
+
+# "New Criterion" from Jake's class. Supposed to be "Minor"
+# attributes %>% filter(RowName == "New Criterion")
+# attributes %>% filter(UserId == "580582")
+
+x <- attributes %>% select(UserId, RubricId, RowName, Attribute)
+x <- x %>% mutate(RowName = str_replace(RowName, "New Criterion", "Minor"))
+x <- x %>% pivot_wider(names_from = "RowName", values_from = "Attribute")
+head(x)
+n_distinct(x) == nrow(x)
+```
+```{r}
+bus499 <- achievements %>% left_join(x, by = c("UserId", "RubricId"))
+```
+
+```{r}
+head(bus499)
+rm(achievements, ref, full, x, attributes)
+rm(test, sdf, aname, pattern)
+```
+
+
+## Data Types and Recoding
+
+Finally, sort out the data types and recode some columns.
+
+
+```{r}
+summary(bus499)
+```
+
+First, convert the achievement levels.
+
+Unsatisfactory (0), Developing (65), Basic (75), Proficient (85), Advanced (100)
+
+```{r}
+table(bus499$Level)
+pattern <- c("^0" = "Unsatisfactory",
+             "65" = "Developing",
+             "75" = "Basic",
+             "85" = "Proficient",
+             "100" = "Advanced")
+bus499 <- bus499 %>% mutate(Level = str_replace_all(Level, pattern))
+```
+
+
+Second, check for typos in LO and fix them.
+
+```{r}
+bus499 <- bus499 %>% mutate(LO = str_replace_all(LO, "PL6b", "PLO6b"))
+```
+
+Third, convert strings to (ordered) factors.
+
+```{r}
+olevel <- c("Unsatisfactory",
+            "Developing",
+            "Basic",
+            "Proficient",
+            "Advanced")
+
+bus499 <- bus499 %>%
+  mutate(across(c(ends_with("Name"), Program:Section, LO:Minor), factor))
+bus499 <- bus499 %>% mutate(Level = ordered(Level, olevel))
+```
+
+
+
