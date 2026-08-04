@@ -45,8 +45,12 @@ survey <- survey %>%
   filter(Rubric == "Yes", !Drop) %>%  select(ID:PLO)
 
 # Extract rubric IDs (rubricid)
-x <- str_extract_all(survey$URL, "rubricId=[0-9]{6}", simplify=TRUE)
-survey$RubricId <- factor(str_extract_all(x, "[0-9]{6}", simplify=TRUE))
+survey$RubricId <- factor(str_extract(survey$URL, "(?<=rubricId=)[0-9]{6}"))
+missing_id <- survey$ID[is.na(survey$RubricId)]
+if (length(missing_id) > 0) {
+  stop("No rubricId found in URL for survey ID(s): ",
+       paste(missing_id, collapse = ", "))
+}
 # Drop duplicates
 id.drop <- c(22, 66, 65, 61, 62, 114, 37, 64, 63)
 df2 <- survey %>% filter(!ID %in% id.drop)
@@ -58,4 +62,9 @@ mdf <- df %>%
                      Course, Section, Course.Section.Original,
                      Assessment, Assessment.Original,
                      Rubric, PLO.Original, PLO), by="RubricId")
+
+# Report merge coverage
+n_unmatched <- sum(is.na(mdf$Instructor))
+message(sprintf("Rubric-survey merge: %d of %d rows (%.1f%%) have no matching survey response",
+                 n_unmatched, nrow(mdf), 100 * n_unmatched / nrow(mdf)))
 
