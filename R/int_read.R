@@ -12,44 +12,30 @@ library(tidyverse)
 library(readxl)
 
 # Set variables
-rootpath <- Sys.getenv("ACBSP_DATA_PATH")
+datapath <- Sys.getenv("ACBSP_DATA_PATH")
+stopifnot("Set ACBSP_DATA_PATH in .Renviron - see README" = nzchar(datapath))
 path19 <- paste0(datapath, "\\AY2019 Backup\\Internal Direct Assessment\\")
 
 # Import the students' learning outcome data
-df <- read_xlsx(paste0(path, "Rubrics.xlsx")) %>%
+df <- read_xlsx(paste0(path19, "Rubrics.xlsx")) %>%
   mutate(across(c(RubricId:Name, LevelAchieved), factor),
          IsScoreOverridden = (IsScoreOverridden == "True"))
 
 # Import the assessment standard data (from MS Forms data)
 # Contains both rubric and non-rubric information
-survey <- read_excel(paste0(path, "Assessment Survey Responses.xlsx"), "Edited")
+survey <- read_excel(paste0(path19, "Assessment Survey Responses.xlsx"), "Edited")
 qs <- names(survey)
-nms <- c("ID" = "ID",
-         "Drop" = "Drop",
-         "Start ti" = "Start",
-         "Completi" = "Complete", 
-         "Email" = "Email",
-         "Name" = "Instructor",
-         "In which" = "Semester",
-         "Course A" = "Course.Section.Original",
-         "Course" = "Course",
-         "Section" = "Section",
-         "What is " = "Assessment.Original",
-         "Assessme" = "Assessment",
-         "Follow u" = "Follow up",
-         "I graded" = "Rubric",
-         "Copy and" = "URL",
-         "Analysis" = "Analysis.Rubric",
-         "Action f" = "Action.Rubric",
-         "What is " = "PLO.Original",
-         "PLO" = "PLO",
-         "What is " = "n.original",
-         "n" = "n",
-         "If this " = "np.original",
-         "np" = "np",
-         "Analysis" = "Analysis.Non.Rubric",
-         "Action f" = "Action.Non.Rubric")
-names(survey) <- nms
+
+# Assign names to columns using the "codebook"
+# Still assign names by position, but checks against expectations
+codebook <- read_csv("R/survey_colnames.csv", col_types = "cc")
+stopifnot(
+  "Survey column count changed - update R/survey_colnames.csv" =
+    nrow(codebook) == length(qs),
+  "Survey question order/wording changed - update R/survey_colnames.csv" =
+    all(str_starts(qs, fixed(codebook$prefix)))
+)
+names(survey) <- codebook$short_name
 
 # Separate out the non-rubric data
 # Non-rubric data are not relevant for D2L output data

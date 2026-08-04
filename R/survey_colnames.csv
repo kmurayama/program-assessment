@@ -1,0 +1,26 @@
+prefix,short_name
+ID,ID
+Drop,Drop
+Start ti,Start
+Completi,Complete
+Email,Email
+Name,Instructor
+In which,Semester
+Course A,Course.Section.Original
+Course,Course
+Section,Section
+What is ,Assessment.Original
+Assessme,Assessment
+Follow u,Follow up
+I graded,Rubric
+Copy and,URL
+Analysis,Analysis.Rubric
+Action f,Action.Rubric
+What is ,PLO.Original
+PLO,PLO
+What is ,n.original
+n,n
+If this ,np.original
+np,np
+Analysis,Analysis.Non.Rubric
+Action f,Action.Non.Rubric
