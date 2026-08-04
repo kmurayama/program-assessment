@@ -1,19 +1,28 @@
+# ==============================================================================
+# Script Name: init_read.R
+# Purpose: Read the data files stored outside the project 
+# Author: Kentaro Murayama (km7813a@gmail.com)
+# Date Created: 
+# Notes: Data files are not included in the project for FERPA compliance. For a
+# self-contained test run, use a synthetic data.
+# ==============================================================================
+
+# Load the libraries
 library(tidyverse)
 library(readxl)
-## ---- import-d2l ----
-rootpath <- "C:\\Users\\HP\\California University of Pennsylvania"
-datapath <- paste0(rootpath, "\\ACBSP data reporting - Documents\\Data\\")
 
-path <- paste0(datapath, "Internal Direct Assessment\\")
+# Set variables
+rootpath <- Sys.getenv("ACBSP_DATA_PATH")
+path19 <- paste0(datapath, "\\AY2019 Backup\\Internal Direct Assessment\\")
 
-fn <- "Rubrics.xlsx"
-df <- read_xlsx(paste0(path, fn)) %>%
+# Import the students' learning outcome data
+df <- read_xlsx(paste0(path, "Rubrics.xlsx")) %>%
   mutate(across(c(RubricId:Name, LevelAchieved), factor),
          IsScoreOverridden = (IsScoreOverridden == "True"))
 
-## ---- import-survey ----
-fn <- "Assessment Survey Responses.xlsx"
-survey <- read_excel(paste0(path, fn), "Edited")
+# Import the assessment standard data (from MS Forms data)
+# Contains both rubric and non-rubric information
+survey <- read_excel(paste0(path, "Assessment Survey Responses.xlsx"), "Edited")
 qs <- names(survey)
 nms <- c("ID" = "ID",
          "Drop" = "Drop",
@@ -42,22 +51,21 @@ nms <- c("ID" = "ID",
          "Action f" = "Action.Non.Rubric")
 names(survey) <- nms
 
-# Non rubric data are not relevant for D2L output data
+# Separate out the non-rubric data
+# Non-rubric data are not relevant for D2L output data
 non <- survey %>%
   filter(Rubric == "No", !Drop) %>%  select(-c(URL:Action.Rubric))
 survey <- survey %>%
   filter(Rubric == "Yes", !Drop) %>%  select(ID:PLO)
 
-## ---- extract-rubricid ----
+# Extract rubric IDs (rubricid)
 x <- str_extract_all(survey$URL, "rubricId=[0-9]{6}", simplify=TRUE)
 survey$RubricId <- factor(str_extract_all(x, "[0-9]{6}", simplify=TRUE))
-
-## ---- drop-duplicates ----
+# Drop duplicates
 id.drop <- c(22, 66, 65, 61, 62, 114, 37, 64, 63)
 df2 <- survey %>% filter(!ID %in% id.drop)
 
-
-## ---- merge ----
+# Merge the rubric information into the assessment data
 mdf <- df %>%
   left_join(df2 %>%
               select(RubricId, Instructor, Semester,
@@ -65,6 +73,3 @@ mdf <- df %>%
                      Assessment, Assessment.Original,
                      Rubric, PLO.Original, PLO), by="RubricId")
 
-# ## ---- import supplementary ----
-# past <- read_excel("data/Assessment Data Main.xlsx", sheet = "Main")
-# rowmap <- read_excel("data/Assessment Data Main.xlsx", sheet = "Mapping")
