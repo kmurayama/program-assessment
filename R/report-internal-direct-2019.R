@@ -2,17 +2,21 @@
 # outcome data and identification information from the survey responses.
 # Note that this is only for the *summative* assessment.
 
-# Set up
+# Set variables
+datapath <- Sys.getenv("ACBSP_DATA_PATH")
+stopifnot("Set ACBSP_DATA_PATH in .Renviron - see README" = nzchar(datapath))
+path19 <- paste0(datapath, "\\AY2019 Backup\\Internal Direct Assessment\\")
+
+# Load the libraries
 library(tidyverse)
-options(dplyr.summarise.inform=FALSE) 
 library(readxl)
-datapath <- "C:\\Users\\kentr\\California University of Pennsylvania\\ACBSP data reporting - Documents\\Data\\"
+options(dplyr.summarise.inform=FALSE) 
 
 # Import the new database and mapping
 sns <- c("prg", "core", "mba")
 mns <- paste0("map_", sns)
-ldf <- sapply(sns, function(x) read_excel(paste0(datapath, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
-lmp <- sapply(mns, function(x) read_excel(paste0(datapath, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
+ldf <- sapply(sns, function(x) read_excel(paste0(path19, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
+lmp <- sapply(mns, function(x) read_excel(paste0(path19, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
 
 # Read the data and process it into a user-level data
 source('R/int_read.R')
@@ -26,7 +30,7 @@ tbl1 <- mdf %>% filter(str_detect(Name, "Major|Minor", negate = TRUE)) %>%
   summarise(Met.UND = mean(Met.UND.bin), Met.GRD = mean(Met.GRD.bin),
             n = n_distinct(UserId),
             Rubric = TRUE)
-miss <- read_excel(paste0(path, "D2L Missing Data Retrievals.xlsx"), "Scraped")
+miss <- read_excel(paste0(path19, "D2L Missing Data Retrievals.xlsx"), "Scraped")
 miss <- miss %>% mutate(Rubric = FALSE) %>% 
   select(-c(Unsatisfactory:Advanced)) %>% mutate(Met.UND = Met, Met.GRD = Met)
 tbl2 <- bind_rows(tbl1, miss)
