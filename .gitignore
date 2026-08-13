@@ -5,6 +5,8 @@
 .Renviron
 data/*
 !data/README.md
+out/*
+!out/.gitkeep
 *docx
 !template*.docx
 *html
