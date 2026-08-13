@@ -5,7 +5,7 @@
 # Set variables
 datapath <- Sys.getenv("ACBSP_DATA_PATH")
 stopifnot("Set ACBSP_DATA_PATH in .Renviron - see README" = nzchar(datapath))
-path19 <- paste0(datapath, "\\AY2019 Backup\\Internal Direct Assessment\\")
+path19 <- paste0(file.path(datapath, "AY2019 Backup", "Internal Direct Assessment"), "/")
 
 # Load the libraries
 library(tidyverse)
