@@ -1,114 +1,48 @@
 # Program Assessment Reporting
 
-Reproduces the assessment report a college accreditation committee relies
-on to track student learning: raw instructor rubric scores and survey
-responses go in, and a summary table showing what share of students met
-each learning goal comes out. Used both internally, to guide teaching
-improvements, and externally, for accreditation review.
+Turns messy, real-world student assessment records — inconsistent rubric
+wording, mixed scoring scales, manual backfills — into a clean, comparable
+outcome table a college accreditation committee can act on. The
+measures themselves (which rubric criteria count toward which learning
+outcome) weren't handed down fixed; they were developed and revised as
+the data was explored.
 
-## Why this exists
+## What's here
 
-Business schools accredited by ACBSP (the field's accrediting body) must
-report what share of students met a proficiency threshold for each
-program learning outcome (PLO) — a specific skill the degree is supposed
-to teach, like written communication or ethical reasoning. Instructors
-supply the raw material: rubric scores they enter in the school's course
-software, plus a short survey filled out per assessment. Before this
-pipeline, that report was built by hand in Excel each cycle, and the
-rubrics themselves weren't standardized — so even the manual version
-couldn't reliably compare one year to the next.
+- `R/int_read.R` / `R/int_munge.R` — read and standardize raw rubric
+  exports and instructor survey responses
+- `R/report-internal-direct-2019.R` — aggregate the cleaned data to an
+  outcome rate per learning goal
+- `data-raw/make_synthetic.R` — generates safe stand-in data so the
+  pipeline runs without any real student records
+- `data/README.md` — documents the source schema and every data-quality
+  quirk the cleaning code corrects for
 
-I led that standardization as committee chair: working with a
-department-wide committee over three annual cycles of evaluation and
-revision, we moved the program onto a common, rubric-based assessment
-scheme. This repo is the analyst-side counterpart I built solo —
-`int_read.R` / `int_munge.R` correct the inconsistent wording, typos,
-and mixed scoring scales that the raw exports still contain,
-and `report-internal-direct-2019.R` aggregates the cleaned data up to
-the PLO level for the accreditation report.
+![Bar chart showing the share of students meeting each learning outcome, four bars against a 70% target line, generated from synthetic demonstration data](docs/img/plo_outcomes_demo.png)
 
-The scripted pipeline matters most for continuity. Rubric-based,
-transparent assessment was a real cultural shift for the department, and
-a reproducible pipeline is what lets that shift outlive any one person
-running it — the code, not institutional memory, carries the standard
-forward. That mattered in practice: the framework survived a later
-merger of the school with two others, was adopted by the newly formed
-department, and the underlying assessment work was presented at an
-ACBSP conference and received an award. Beyond continuity, it also
-improves accuracy (accreditation depends on defensible, transparent
-numbers) and cuts the time cost of each reporting cycle.
-
-## Data and privacy
-
-The real source files contain student- and instructor-identifying data,
-which is protected under FERPA, the U.S. student-privacy law. So they
-live outside this repo (path set via `ACBSP_DATA_PATH` in `.Renviron`,
-itself excluded from version control) and are never committed.
-`data/README.md` documents the schema of every source file
-column-by-column — type, example value, and any quirks the munging code
-corrects for — so the pipeline's logic is legible without needing access
-to the real data.
-
-`data-raw/make_synthetic.R` generates small stand-in `.xlsx` files that
-match that schema and deliberately reproduce the real quirks (typos,
-mixed rubric scales, an online-section flag, a missing-data backfill,
-etc.), so the pipeline can be run and inspected end-to-end without any
-privacy risk. The synthetic output is committed under `data/synthetic/`.
-
-## Quickstart
+## How to run
 
 ```r
 # Requires: tidyverse, readxl, writexl
-Rscript data-raw/make_synthetic.R   # only needed once, output is already committed
+Rscript data-raw/make_synthetic.R   # optional - output is already committed
 ```
 
-Copy `.Renviron.example` to `.Renviron` (already points `ACBSP_DATA_PATH`
-at the committed synthetic data), then run:
+Copy `.Renviron.example` to `.Renviron` (already points at the committed
+synthetic data), then:
 
 ```r
 source("R/report-internal-direct-2019.R")
+Rscript R/plot_outcomes.R
 ```
-
-This sources `R/int_read.R` and `R/int_munge.R` internally and writes
-`out/prg_internal.csv` and `out/core_internal.csv`.
 
 To run against real data instead, point `ACBSP_DATA_PATH` at the real
-data root (see comments in `.Renviron.example`).
+data root (see `.Renviron.example`).
 
-## Pipeline
+## What this demonstrates
 
-1. **`R/int_read.R`** — reads the rubric export and the instructor survey,
-   matches survey columns by prefix against `R/survey_colnames.csv`, and
-   merges the two on rubric ID.
-2. **`R/int_munge.R`** — standardizes rubric criterion names (which mean
-   different things per course), collapses achievement scores from
-   several different wordings/scales onto one ordered scale, flags
-   attribute rows (major/minor) versus real scores, and derives
-   met/not-met outcomes.
-3. **`R/report-internal-direct-2019.R`** — backfills rows missing from
-   the rubric export via a separately-tracked recovery file, aggregates
-   section/semester-level scores up to course and then PLO level using
-   the program's PLO mapping, and writes the outcome tables to `out/`.
-
-## Repo layout
-
-```
-R/                  Pipeline scripts (read -> munge -> report)
-data/               Real data path config (gitignored) + schema README
-data/synthetic/     Committed synthetic stand-in data
-data-raw/           Synthetic data generator
-out/                Report outputs (gitignored, regenerated by the pipeline)
-archive/            Prior years' exploratory notebooks and one-off scripts,
-                    kept for reference but not part of the current pipeline
-```
-
-## Status
-
-Built around a synthetic-data-first workflow so it's safe to publish and
-run without access to real student data. Two things intentionally out of
-scope for now, tracked for later:
-
-- Loading data via SQLite instead of reading `.xlsx` directly.
-- `report-external-direct-2019.R` (external/standardized-test assessment
-  data), currently in `archive/` pending its own synthetic data and
-  documentation.
+Turning ambiguous raw data into a coherent measurement framework — not
+just cleaning it, but deciding what it should mean — plus building a
+reproducible R pipeline and working within student-privacy constraints
+(real data never enters this repo; see `data/README.md`). For the fuller
+story, including how the outcome categories emerged through exploratory
+analysis: **[docs/CASE_STUDY.md](docs/CASE_STUDY.md)**.
