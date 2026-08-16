@@ -4,8 +4,7 @@
 #   AY2019 Internal Direct Assessment data files, matching the schema
 #   documented in data/README.md, so R/int_read.R -> R/int_munge.R ->
 #   R/report-internal-direct-2019.R can run end-to-end without access to
-#   real student data. Output is committed (see data/README.md), so this
-#   script only needs to be re-run if the synthetic scenario changes.
+#   real student data.
 # Notes: Deliberately reproduces the real quirks the munging code handles:
 #   the "Unsatisactory" typo, the "Level N" achievement scale, mixed
 #   achievement-scale wording, ECO 201/202 criterion-name corrections,

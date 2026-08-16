@@ -108,17 +108,28 @@ res <- sdf %>% filter(str_detect(Name, "Major|Minor", negate = TRUE)) %>%
   group_by(Assessment, Name, PLO, Major) %>%
   summarise(Met.UND = mean(Met.UND.bin), Met.GRD = mean(Met.GRD.bin),
             n = n_distinct(UserId))
-lres <- list()
-lres[["PLO2"]] <- res %>% filter(str_detect(Name, "Plo2")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 2)
-lres[["PLO3"]] <- res %>% filter(str_detect(Name, "Plo3")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 3)
-lres[["PLO4"]] <- res %>% filter(str_detect(Name, "Plo4")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 4)
-lres[["PLO5"]] <- res %>% filter(str_detect(Name, "5[a|b|c|d]")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 5)
-lres[["PLO6"]] <- res %>% filter(str_detect(Name, "6[e|f|g]")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 6)
-lres[["PLO7"]] <- res %>% filter(str_detect(Name, "Plo7")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 7)
-lres[["PLO8"]] <- res %>% filter(str_detect(Name, "Plo8")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 8)
-lres[["PLO9"]] <- res %>% filter(str_detect(Name, "Plo9")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 9)
-lres[["PLO10"]] <- res %>% filter(str_detect(Name, ".*")) %>% group_by(Major) %>% summarise(Met = mean(Met.UND), n = min(n)) %>% mutate(PLO = 10)
-out <- bind_rows(lres)
+plo_patterns <- tribble(
+  ~PLO.out, ~criterion_pattern,
+   2L,      "Plo2",
+   3L,      "Plo3",
+   4L,      "Plo4",
+   5L,      "5[abcd]",
+   6L,      "6[efg]",
+   7L,      "Plo7",
+   8L,      "Plo8",
+   9L,      "Plo9",
+  10L,      ".*"       # Overall composite: include every criterion
+)
+
+out <- crossing(res, plo_patterns) %>%
+  filter(str_detect(Name, criterion_pattern)) %>%
+  group_by(PLO.out, Major) %>%
+  summarise(
+    Met = mean(Met.UND),
+    n = min(n),
+    .groups = "drop"
+  ) %>%
+  rename(PLO = PLO.out)
 
 out_wide <- pivot_wider(out, id_cols = PLO, names_from = Major, values_from = c(Met, n))
 

@@ -24,7 +24,7 @@ the data was explored.
 
 ```r
 # Requires: tidyverse, readxl, writexl
-Rscript data-raw/make_synthetic.R   # optional - output is already committed
+Rscript data-raw/make_synthetic.R
 ```
 
 Copy `.Renviron.example` to `.Renviron` (already points at the committed
