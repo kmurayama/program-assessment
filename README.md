@@ -22,9 +22,21 @@ the data was explored.
 
 ## How to run
 
+This project uses [`renv`](https://rstudio.github.io/renv/) to keep package
+versions reproducible. After cloning the repository, open the R project and
+restore its packages once:
+
 ```r
-# Requires: tidyverse, readxl, writexl
-Rscript data-raw/make_synthetic.R
+renv::restore()
+```
+
+When intentionally adding or updating a package, install it with
+`renv::install()` and commit the updated lockfile created by
+`renv::snapshot()`.
+
+```r
+# Generate the synthetic input files.
+source("data-raw/make_synthetic.R")
 ```
 
 Copy `.Renviron.example` to `.Renviron` (already points at the committed
@@ -32,7 +44,7 @@ synthetic data), then:
 
 ```r
 source("R/report-internal-direct-2019.R")
-Rscript R/plot_outcomes.R
+source("R/plot_outcomes.R")
 ```
 
 To run against real data instead, point `ACBSP_DATA_PATH` at the real
