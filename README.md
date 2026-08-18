@@ -47,6 +47,15 @@ source("R/report-internal-direct-2019.R")
 source("R/plot_outcomes.R")
 ```
 
+## How to test
+
+After restoring the `renv` environment, run the unit, input-validation, and
+synthetic end-to-end tests from the project root:
+
+```sh
+Rscript tests/testthat.R
+```
+
 To run against real data instead, point `ACBSP_DATA_PATH` at the real
 data root (see `.Renviron.example`).
 
