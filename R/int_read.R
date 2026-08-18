@@ -17,7 +17,17 @@ stopifnot("Set ACBSP_DATA_PATH in .Renviron - see README" = nzchar(datapath))
 path19 <- paste0(file.path(datapath, "AY2019 Backup", "Internal Direct Assessment"), "/")
 
 # Import the students' learning outcome data
-df <- read_xlsx(paste0(path19, "Rubrics.xlsx")) %>%
+df <- read_xlsx(paste0(path19, "Rubrics.xlsx"))
+required_rubric_columns <- c(
+  "RubricId", "UserId", "Name", "Score", "LevelAchieved", "Feedback",
+  "IsScoreOverridden"
+)
+missing_rubric_columns <- setdiff(required_rubric_columns, names(df))
+if (length(missing_rubric_columns) > 0) {
+  stop("Rubrics.xlsx is missing required column(s): ",
+       paste(missing_rubric_columns, collapse = ", "))
+}
+df <- df %>%
   mutate(across(c(RubricId:Name, LevelAchieved), factor),
          IsScoreOverridden = (IsScoreOverridden == "True"))
 
@@ -55,13 +65,25 @@ if (length(missing_id) > 0) {
 id.drop <- c(22, 66, 65, 61, 62, 114, 37, 64, 63)
 df2 <- survey %>% filter(!ID %in% id.drop)
 
+# One survey response should describe each rubric. Duplicate keys would
+# multiply student/criterion rows in the join and inflate downstream counts.
+duplicate_rubric_ids <- df2 %>%
+  filter(!is.na(RubricId)) %>%
+  count(RubricId, name = "responses") %>%
+  filter(responses > 1)
+if (nrow(duplicate_rubric_ids) > 0) {
+  stop("Multiple retained survey responses found for rubricId(s): ",
+       paste(duplicate_rubric_ids$RubricId, collapse = ", "))
+}
+
 # Merge the rubric information into the assessment data
 mdf <- df %>%
   left_join(df2 %>%
               select(RubricId, Instructor, Semester,
-                     Course, Section, Course.Section.Original,
-                     Assessment, Assessment.Original,
-                     Rubric, PLO.Original, PLO), by="RubricId")
+                      Course, Section, Course.Section.Original,
+                      Assessment, Assessment.Original,
+                      Rubric, PLO.Original, PLO),
+            by = "RubricId", relationship = "many-to-one")
 
 # Report merge coverage
 n_unmatched <- sum(is.na(mdf$Instructor))

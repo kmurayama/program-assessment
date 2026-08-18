@@ -26,5 +26,6 @@ p <- ggplot(tbl, aes(Met, plo, fill = met_target)) +
   theme_minimal(base_size = 12) +
   theme(plot.subtitle = element_text(color = "grey40", size = 9))
 
+dir.create("docs/img", recursive = TRUE, showWarnings = FALSE)
 ggsave("docs/img/plo_outcomes_demo.png", p, width = 6.5, height = 4, dpi = 150)
 message("Wrote docs/img/plo_outcomes_demo.png")

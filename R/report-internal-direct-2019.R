@@ -53,17 +53,25 @@ map1 <- lmp$map_prg %>% filter(group1 == "Course")
 tbl5 <- tbl4 %>% filter(PLO %in% map1$internal_rubric_tags)
 # Filter out relevant information
 lres <- list()
-for(i in 1:nrow(map1)){
+for(i in seq_len(nrow(map1))){
   x <- map1[i, ]
   lres[[i]] <- tbl5 %>%
     filter(PLO == x$internal_rubric_tags,
            str_detect(Name, x$internal_rubric_keys2019)) %>% 
     mutate(plo = x$plo)
 }
-# Summarized for PLOs and export
-tbl_assess <- bind_rows(lres) %>%
-  group_by(plo) %>%
-  summarize(Met = mean(Met.UND), n = max(n))
+# Summarize for PLOs and export. An empty mapping, or a mapping with no
+# matching rubric criteria, should produce an empty result instead of an
+# indexing error or a max(n) = -Inf warning.
+mapped <- bind_rows(lres)
+if (nrow(mapped) == 0) {
+  tbl_assess <- tibble(plo = character(), Met = double(), n = integer())
+} else {
+  tbl_assess <- mapped %>%
+    group_by(plo) %>%
+    summarize(Met = mean(Met.UND), n = max(n))
+}
+dir.create("out", recursive = TRUE, showWarnings = FALSE)
 write_csv(tbl_assess, "out/prg_internal.csv")
 
 
@@ -72,17 +80,22 @@ map1c <- lmp$map_core %>% filter(group1 == "Course")
 tbl5c <- tbl4 %>% filter(PLO %in% map1c$internal_rubric_tags)
 # Filter out
 lres <- list()
-for(i in 1:nrow(map1c)){
+for(i in seq_len(nrow(map1c))){
   x <- map1c[i, ]
   lres[[i]] <- tbl5c %>%
     filter(PLO == x$internal_rubric_tags,
            str_detect(Name, x$internal_rubric_keys2019)) %>% 
     mutate(plo = x$plo)
 }
-# Summarized for PLOs
-tbl_assess <- bind_rows(lres) %>%
-  group_by(plo) %>%
-  summarize(Met = mean(Met.UND), n = max(n))
+# Summarize for PLOs, including the valid empty-result case.
+mapped <- bind_rows(lres)
+if (nrow(mapped) == 0) {
+  tbl_assess <- tibble(plo = character(), Met = double(), n = integer())
+} else {
+  tbl_assess <- mapped %>%
+    group_by(plo) %>%
+    summarize(Met = mean(Met.UND), n = max(n))
+}
 
 # ------------------------------------------------------------------------------
 # ...and also disaggregate by majors. Brute force.
