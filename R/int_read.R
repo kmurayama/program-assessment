@@ -11,13 +11,12 @@
 library(tidyverse)
 library(readxl)
 
-# Set variables
-datapath <- Sys.getenv("ACBSP_DATA_PATH")
-stopifnot("Set ACBSP_DATA_PATH in .Renviron - see README" = nzchar(datapath))
-path19 <- paste0(file.path(datapath, "AY2019 Backup", "Internal Direct Assessment"), "/")
+# Directory containing the four assessment input workbooks
+input_dir <- Sys.getenv("ACBSP_DATA_PATH")
+stopifnot("Set ACBSP_DATA_PATH in .Renviron - see README" = nzchar(input_dir))
 
 # Import the students' learning outcome data
-df <- read_xlsx(paste0(path19, "Rubrics.xlsx"))
+df <- read_xlsx(file.path(input_dir, "Rubrics.xlsx"))
 required_rubric_columns <- c(
   "RubricId", "UserId", "Name", "Score", "LevelAchieved", "Feedback",
   "IsScoreOverridden"
@@ -33,7 +32,9 @@ df <- df %>%
 
 # Import the assessment standard data (from MS Forms data)
 # Contains both rubric and non-rubric information
-survey <- read_excel(paste0(path19, "Assessment Survey Responses.xlsx"), "Edited")
+survey <- read_excel(
+  file.path(input_dir, "Assessment Survey Responses.xlsx"), "Edited"
+)
 qs <- names(survey)
 
 # Assign names to columns using the "codebook"

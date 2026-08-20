@@ -2,10 +2,9 @@
 # outcome data and identification information from the survey responses.
 # Note that this is only for the *summative* assessment.
 
-# Set variables
-datapath <- Sys.getenv("ACBSP_DATA_PATH")
-stopifnot("Set ACBSP_DATA_PATH in .Renviron - see README" = nzchar(datapath))
-path19 <- paste0(file.path(datapath, "AY2019 Backup", "Internal Direct Assessment"), "/")
+# Directory containing the four assessment input workbooks
+input_dir <- Sys.getenv("ACBSP_DATA_PATH")
+stopifnot("Set ACBSP_DATA_PATH in .Renviron - see README" = nzchar(input_dir))
 
 # Load the libraries
 library(tidyverse)
@@ -15,8 +14,8 @@ options(dplyr.summarise.inform=FALSE)
 # Import the new database and mapping
 sns <- c("prg", "core", "mba")
 mns <- paste0("map_", sns)
-ldf <- sapply(sns, function(x) read_excel(paste0(path19, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
-lmp <- sapply(mns, function(x) read_excel(paste0(path19, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
+ldf <- sapply(sns, function(x) read_excel(file.path(input_dir, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
+lmp <- sapply(mns, function(x) read_excel(file.path(input_dir, "Assessment Data Main.xlsx"), x), simplify = FALSE, USE.NAMES = TRUE)
 
 # Read the data and process it into a user-level data
 source('R/int_read.R')
@@ -30,7 +29,9 @@ tbl1 <- mdf %>% filter(str_detect(Name, "Major|Minor", negate = TRUE)) %>%
   summarise(Met.UND = mean(Met.UND.bin), Met.GRD = mean(Met.GRD.bin),
             n = n_distinct(UserId),
             Rubric = TRUE)
-miss <- read_excel(paste0(path19, "D2L Missing Data Retrievals.xlsx"), "Scraped")
+miss <- read_excel(
+  file.path(input_dir, "D2L Missing Data Retrievals.xlsx"), "Scraped"
+)
 miss <- miss %>% mutate(Rubric = FALSE) %>% 
   select(-c(Unsatisfactory:Advanced)) %>% mutate(Met.UND = Met, Met.GRD = Met)
 tbl2 <- bind_rows(tbl1, miss)
@@ -71,8 +72,8 @@ if (nrow(mapped) == 0) {
     group_by(plo) %>%
     summarize(Met = mean(Met.UND), n = max(n))
 }
-dir.create("out", recursive = TRUE, showWarnings = FALSE)
-write_csv(tbl_assess, "out/prg_internal.csv")
+dir.create("outputs", recursive = TRUE, showWarnings = FALSE)
+write_csv(tbl_assess, "outputs/prg_internal.csv")
 
 
 # 4.b. Select core -------------------------------------------------------------
@@ -146,5 +147,5 @@ out <- crossing(res, plo_patterns) %>%
 
 out_wide <- pivot_wider(out, id_cols = PLO, names_from = Major, values_from = c(Met, n))
 
-write_csv(out_wide, "out/core_internal.csv")
+write_csv(out_wide, "outputs/core_internal.csv")
 

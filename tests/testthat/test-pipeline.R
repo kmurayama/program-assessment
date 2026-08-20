@@ -9,8 +9,11 @@ test_that("synthetic pipeline produces stable, valid outputs", {
       envir = generator_env
     )
   )
+  input_dir <- file.path(
+    sandbox, "data", "synthetic", "AY2019", "Internal Direct Assessment"
+  )
   withr::local_envvar(
-    ACBSP_DATA_PATH = file.path(sandbox, "data", "synthetic")
+    ACBSP_DATA_PATH = input_dir
   )
 
   pipeline_env <- new.env(parent = globalenv())
@@ -18,11 +21,11 @@ test_that("synthetic pipeline produces stable, valid outputs", {
     sys.source("R/report-internal-direct-2019.R", envir = pipeline_env),
     "Rubric-survey merge: 2 of 171 rows"
   )
-  expect_true(file.exists("out/prg_internal.csv"))
-  expect_true(file.exists("out/core_internal.csv"))
+  expect_true(file.exists("outputs/prg_internal.csv"))
+  expect_true(file.exists("outputs/core_internal.csv"))
 
   program <- readr::read_csv(
-    "out/prg_internal.csv", show_col_types = FALSE
+    "outputs/prg_internal.csv", show_col_types = FALSE
   ) %>% arrange(plo)
   expected_program <- tribble(
     ~plo,    ~Met,                  ~n,
@@ -37,7 +40,7 @@ test_that("synthetic pipeline produces stable, valid outputs", {
   expect_identical(anyDuplicated(program$plo), 0L)
 
   core <- readr::read_csv(
-    "out/core_internal.csv", show_col_types = FALSE
+    "outputs/core_internal.csv", show_col_types = FALSE
   ) %>% arrange(PLO)
   expected_core <- tribble(
     ~PLO, ~Met_Accounting, ~Met_ISBC, ~n_Accounting, ~n_ISBC,
@@ -66,10 +69,10 @@ test_that("empty mapping tables do not cause invalid row indexing", {
       envir = new.env(parent = globalenv())
     )
   )
-  workbook_path <- file.path(
-    sandbox, "data", "synthetic", "AY2019 Backup",
-    "Internal Direct Assessment", "Assessment Data Main.xlsx"
+  input_dir <- file.path(
+    sandbox, "data", "synthetic", "AY2019", "Internal Direct Assessment"
   )
+  workbook_path <- file.path(input_dir, "Assessment Data Main.xlsx")
   sheet_names <- c("prg", "core", "mba", "map_prg", "map_core", "map_mba")
   workbook <- setNames(
     lapply(sheet_names, function(sheet) {
@@ -81,7 +84,7 @@ test_that("empty mapping tables do not cause invalid row indexing", {
   suppressWarnings(writexl::write_xlsx(workbook, workbook_path))
 
   withr::local_envvar(
-    ACBSP_DATA_PATH = file.path(sandbox, "data", "synthetic")
+    ACBSP_DATA_PATH = input_dir
   )
   expect_no_error(
     suppressMessages(
@@ -93,7 +96,7 @@ test_that("empty mapping tables do not cause invalid row indexing", {
   )
 
   program <- readr::read_csv(
-    "out/prg_internal.csv", show_col_types = FALSE
+    "outputs/prg_internal.csv", show_col_types = FALSE
   )
   expect_equal(names(program), c("plo", "Met", "n"))
   expect_equal(nrow(program), 0L)

@@ -2,8 +2,8 @@
 #
 # To run the pipeline against the committed synthetic data (no access to
 # real student data required):
-ACBSP_DATA_PATH="data/synthetic"
+ACBSP_DATA_PATH="data/synthetic/AY2019/Internal Direct Assessment"
 
-# To run against the real data instead (requires access), point this at
-# the real data root, e.g.:
-# ACBSP_DATA_PATH="C:\Users\you\path\to\Data"
+# To run against the real data instead (requires access), point this directly
+# at the directory containing the four assessment input workbooks, e.g.:
+# ACBSP_DATA_PATH="C:\Users\you\path\to\AY2019 Backup\Internal Direct Assessment"

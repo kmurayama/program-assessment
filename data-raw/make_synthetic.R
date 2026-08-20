@@ -19,7 +19,7 @@ library(writexl)
 
 set.seed(20190821)
 
-out_dir <- file.path("data", "synthetic", "AY2019 Backup",
+out_dir <- file.path("data", "synthetic", "AY2019",
                       "Internal Direct Assessment")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 

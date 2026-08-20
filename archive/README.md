@@ -14,10 +14,10 @@ current tests, start with the [project README](../README.md).
 
 | Stage | Main question | What changed | Representative notebooks |
 | --- | --- | --- | --- |
-| Initial exploration | What patterns and data limitations are visible? | Compared trends, internal and external measures, and results against targets; noted missingness, changing standards, and possible instructor effects. | [`note_inspecting_assessment_01.Rmd`](note_inspecting_assessment_01.Rmd) |
-| Discussion-ready analysis | How can the findings support department conversations? | Turned early plots into mapping-driven, program-level views for faculty meetings and strategic planning. | [`note_inspecting_assessment_02.Rmd`](note_inspecting_assessment_02.Rmd), [`note_prepare_acbsp_tables.Rmd`](note_prepare_acbsp_tables.Rmd) |
-| Collaborative revision | Which definitions, displays, and comparisons are actually useful? | Recorded specification corrections, requests for supporting data, presentation changes, new disaggregations, and follow-up questions from the first review session. | [`note_session1_feedback_01.Rmd`](note_session1_feedback_01.Rmd), [`session1/`](session1/) |
-| Operationalization | Which parts of the exploratory process are stable enough to automate? | Simplified the transformations, moved definitions into mapping tables, and established section-, course-, and outcome-level aggregation. | [`note_annual-reports-02.Rmd`](note_annual-reports-02.Rmd), [`note_annual-reports-03.Rmd`](note_annual-reports-03.Rmd) |
+| Initial exploration | What patterns and data limitations are visible? | Compared trends, internal and external measures, and results against targets; noted missingness, changing standards, and possible instructor effects. | [`note_inspecting_assessment_01.Rmd`](ay2019/note_inspecting_assessment_01.Rmd) |
+| Discussion-ready analysis | How can the findings support department conversations? | Turned early plots into mapping-driven, program-level views for faculty meetings and strategic planning. | [`note_inspecting_assessment_02.Rmd`](ay2019/note_inspecting_assessment_02.Rmd), [`note_prepare_acbsp_tables.Rmd`](ay2019/note_prepare_acbsp_tables.Rmd) |
+| Collaborative revision | Which definitions, displays, and comparisons are actually useful? | Recorded specification corrections, requests for supporting data, presentation changes, new disaggregations, and follow-up questions from the first review session. | [`note_session1_feedback_01.Rmd`](ay2019/note_session1_feedback_01.Rmd), [`session1/`](session1/) |
+| Operationalization | Which parts of the exploratory process are stable enough to automate? | Simplified the transformations, moved definitions into mapping tables, and established section-, course-, and outcome-level aggregation. | [`note_annual-reports-02.Rmd`](ay2019/note_annual-reports-02.Rmd), [`note_annual-reports-03.Rmd`](ay2019/note_annual-reports-03.Rmd) |
 | New-cycle stress test | Does the framework survive another year of differently structured data? | Checked raw vocabularies and identifiers, reviewed exceptions course by course, investigated duplicate links, and generalized scoring rules. | [`ay2020/note-prelim-01-test-data.Rmd`](ay2020/note-prelim-01-test-data.Rmd), [`ay2020/note-prelim-02-process.Rmd`](ay2020/note-prelim-02-process.Rmd) |
 | Standardization | How should recurring inconsistencies be handled reproducibly? | Separated systematic corrections from manual review, defined canonical columns and scales, and treated lookup tables as the reference layer. | [`ay2021/note01-standardize-data.Rmd`](ay2021/note01-standardize-data.Rmd), [`ay2021/note02-read-ay21-data.Rmd`](ay2021/note02-read-ay21-data.Rmd) |
 
@@ -56,13 +56,13 @@ implementation, or a potentially meaningful difference in student outcomes.
 Readers do not need to open every notebook. The following sequence provides a
 compact view of the evolution:
 
-1. [`note_inspecting_assessment_01.Rmd`](note_inspecting_assessment_01.Rmd) —
+1. [`note_inspecting_assessment_01.Rmd`](ay2019/note_inspecting_assessment_01.Rmd) —
    open-ended exploration and the first analytical questions.
-2. [`note_inspecting_assessment_02.Rmd`](note_inspecting_assessment_02.Rmd) —
+2. [`note_inspecting_assessment_02.Rmd`](ay2019/note_inspecting_assessment_02.Rmd) —
    reusable views prepared for faculty discussion.
-3. [`note_session1_feedback_01.Rmd`](note_session1_feedback_01.Rmd) — the
+3. [`note_session1_feedback_01.Rmd`](ay2019/note_session1_feedback_01.Rmd) — the
    feedback loop and resulting revisions.
-4. [`note_annual-reports-02.Rmd`](note_annual-reports-02.Rmd) — consolidation of
+4. [`note_annual-reports-02.Rmd`](ay2019/note_annual-reports-02.Rmd) — consolidation of
    the emerging measurement and reporting scheme.
 5. [`ay2020/note-prelim-01-test-data.Rmd`](ay2020/note-prelim-01-test-data.Rmd)
    and [`ay2020/note-prelim-02-process.Rmd`](ay2020/note-prelim-02-process.Rmd)
@@ -72,9 +72,9 @@ compact view of the evolution:
 
 The conference materials summarize the same process for an external audience:
 
-- [`memo_conference_acbsp_nov2020.md`](memo_conference_acbsp_nov2020.md)
-- [`slides_acbsp_regional_01.Rmd`](slides_acbsp_regional_01.Rmd)
-- [`slides_acbsp_regional_03.Rmd`](slides_acbsp_regional_03.Rmd)
+- [`memo_conference_acbsp_nov2020.md`](ay2019/memo_conference_acbsp_nov2020.md)
+- [`slides_acbsp_regional_01.Rmd`](ay2019/slides_acbsp_regional_01.Rmd)
+- [`slides_acbsp_regional_03.Rmd`](ay2019/slides_acbsp_regional_03.Rmd)
 
 ## From notebooks to the current pipeline
 
@@ -90,7 +90,7 @@ The exploratory logic was progressively extracted into the scripts under
 - [`plot_outcomes.R`](../R/plot_outcomes.R) creates the final outcome display.
 
 In particular, the section aggregation, mapping, and disaggregation developed
-in [`note_annual-reports-02.Rmd`](note_annual-reports-02.Rmd) can be followed
+in [`note_annual-reports-02.Rmd`](ay2019/note_annual-reports-02.Rmd) can be followed
 into [`report-internal-direct-2019.R`](../R/report-internal-direct-2019.R). This
 is the clearest bridge between the exploratory record and the end product.
 

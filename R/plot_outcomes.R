@@ -1,6 +1,6 @@
 # ==============================================================================
 # Script Name: plot_outcomes.R
-# Purpose: Turn out/prg_internal.csv (produced by report-internal-direct-2019.R)
+# Purpose: Turn outputs/prg_internal.csv (produced by report-internal-direct-2019.R)
 #   into a single readable chart: share of students meeting the proficiency
 #   target, per program learning outcome (PLO).
 # Notes: Run after report-internal-direct-2019.R. Intended for the synthetic
@@ -11,7 +11,7 @@ library(tidyverse)
 
 target <- 0.70
 
-tbl <- read_csv("out/prg_internal.csv", show_col_types = FALSE) %>%
+tbl <- read_csv("outputs/prg_internal.csv", show_col_types = FALSE) %>%
   mutate(plo = fct_reorder(plo, Met), met_target = Met >= target)
 
 p <- ggplot(tbl, aes(Met, plo, fill = met_target)) +

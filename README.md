@@ -56,8 +56,8 @@ synthetic end-to-end tests from the project root:
 Rscript tests/testthat.R
 ```
 
-To run against real data instead, point `ACBSP_DATA_PATH` at the real
-data root (see `.Renviron.example`).
+To run against real data instead, point `ACBSP_DATA_PATH` at the directory
+containing the four assessment input workbooks (see `.Renviron.example`).
 
 ## What this demonstrates
 

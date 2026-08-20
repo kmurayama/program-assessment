@@ -16,7 +16,7 @@ noted per file/sheet above each table, not per column.
 
 ## Rubrics.xlsx
 
-Path: `<ACBSP_DATA_PATH>/AY2019 Backup/Internal Direct Assessment/Rubrics.xlsx`
+Path: `<ACBSP_DATA_PATH>/Rubrics.xlsx`
 Sheet: Rubrics
 FERPA: PII contained
 
@@ -38,7 +38,7 @@ round.
 
 ## Assessment Survey Responses.xlsx
 
-Path: `<ACBSP_DATA_PATH>/AY2019 Backup/Internal Direct Assessment/Assessment Survey Responses.xlsx`
+Path: `<ACBSP_DATA_PATH>/Assessment Survey Responses.xlsx`
 Sheet: `Edited`
 One row per instructor-submitted assessment survey response. Column
 names in the raw file are full question text; matched by prefix against
@@ -78,7 +78,7 @@ filtered to the author's own rows only rather than shared unfiltered.
 
 ## Assessment Data Main.xlsx
 
-Path: `<ACBSP_DATA_PATH>/AY2019 Backup/Internal Direct Assessment/Assessment Data Main.xlsx`
+Path: `<ACBSP_DATA_PATH>/Assessment Data Main.xlsx`
 Sheets: `prg`, `core`, `mba` (data) and `map_prg`, `map_core`, `map_mba` (mappings)
 
 ### Data sheets: `prg` / `core` / `mba`
@@ -129,7 +129,7 @@ unless checked otherwise.
 
 ## D2L Missing Data Retrievals.xlsx
 
-Path: `<ACBSP_DATA_PATH>/AY2019 Backup/Internal Direct Assessment/D2L Missing Data Retrievals.xlsx`
+Path: `<ACBSP_DATA_PATH>/D2L Missing Data Retrievals.xlsx`
 Sheet: `Scraped`
 Manually-collected backfill for assessments missing from the rubric
 export; unioned with the summarized rubric data so it must share the
@@ -159,17 +159,18 @@ assessment, criterion) — pre-aggregated across students, unlike
 
 [data-raw/make_synthetic.R](../data-raw/make_synthetic.R) generates small
 stand-in `.xlsx` files for the four sources above (2 programs, 4 courses,
-~40 students total) and writes them to `data/synthetic/AY2019
-Backup/Internal Direct Assessment/`, mirroring the real subpath so the
-pipeline scripts don't need to know the difference. The output isn't
-committed (`data/*` is gitignored, same as the real data) — run the
-generator once (`Rscript data-raw/make_synthetic.R`, requires the
-`writexl` package) to produce it locally.
+~40 students total) and writes them to
+`data/synthetic/AY2019/Internal Direct Assessment/`. The folder does not need
+to reproduce incidental words such as `Backup` from the real storage layout;
+the pipeline uses `ACBSP_DATA_PATH` as the directory containing the four input
+workbooks. The generated synthetic files are safe to commit. Run
+`Rscript data-raw/make_synthetic.R` (requires the `writexl` package) to refresh
+them.
 
 To run `R/int_read.R` → `R/int_munge.R` → `R/report-internal-direct-
 2019.R` against it: after generating the files above, copy
-[.Renviron.example](../.Renviron.example) to `.Renviron` (gitignored) —
-it already points `ACBSP_DATA_PATH` at `data/synthetic`.
+[.Renviron.example](../.Renviron.example) to `.Renviron` (gitignored)—it
+already points `ACBSP_DATA_PATH` at the synthetic workbook directory.
 
 Deliberately reproduces the real quirks the munging code handles, so the
 demo actually exercises the interesting logic instead of running on inert

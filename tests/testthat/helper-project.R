@@ -21,12 +21,9 @@ run_munge <- function(input) {
   script_env$mdf
 }
 
-write_read_fixture <- function(data_root, url = NULL, duplicate_rubric = FALSE,
+write_read_fixture <- function(input_dir, url = NULL, duplicate_rubric = FALSE,
                                omit_rubric_column = NULL,
                                omit_survey_column = FALSE) {
-  input_dir <- file.path(
-    data_root, "AY2019 Backup", "Internal Direct Assessment"
-  )
   dir.create(input_dir, recursive = TRUE, showWarnings = FALSE)
 
   rubrics <- tibble(
@@ -102,9 +99,9 @@ write_read_fixture <- function(data_root, url = NULL, duplicate_rubric = FALSE,
   invisible(input_dir)
 }
 
-source_read_fixture <- function(data_root) {
+source_read_fixture <- function(input_dir) {
   script_env <- new.env(parent = globalenv())
-  withr::local_envvar(ACBSP_DATA_PATH = data_root)
+  withr::local_envvar(ACBSP_DATA_PATH = input_dir)
   withr::local_dir(project_path())
   sys.source(project_path("R", "int_read.R"), envir = script_env)
   script_env

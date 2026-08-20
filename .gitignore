@@ -1,22 +1,31 @@
+# RStudio project metadata and local R session state.
+# These files are machine- or user-specific and should not be shared.
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
+
+# Local environment variables, including paths to confidential source data.
+# Commit .Renviron.example instead; never commit the populated .Renviron file.
 .Renviron
-data/*
-!data/README.md
-out/*
-!out/.gitkeep
+
+# Regenerable pipeline outputs.
+# Retain the empty directory in Git so scripts have a documented destination.
+outputs/*
+!outputs/.gitkeep
+
+# Rendered office and HTML documents.
+# Reusable source templates are exceptions; generated deliverables stay local.
 *docx
 !template*.docx
 *html
 *pptx
 !my-style*.pptx
 
-fig/*
-out/*
-
-*/out/*
-*/*_cache/*
-*/*_files/*
-*/libs/*
+# Outputs and supporting assets generated when rendering R Markdown files.
+# Keep the legacy `out` rule because archived notebooks still use that name.
+**/outputs/**
+**/out/**
+**/*_cache/**
+**/*_files/**
+**/libs/**
