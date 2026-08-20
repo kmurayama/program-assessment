@@ -8,6 +8,20 @@
 > project's outputs, it does so in general terms, without institution
 > names or real outcome numbers.
 
+## In brief
+
+The main result was not only an automated accreditation report. It was a
+measurement framework that became more defensible with each reporting cycle.
+I used exploratory notebooks to inspect unfamiliar source data, test possible
+definitions, and prepare views for faculty discussion. Feedback from those
+discussions corrected specifications, added instructional context, and changed
+both the mappings and the presentation. Once a rule continued to work across
+programs and annual datasets, I moved it into the reusable R pipeline.
+
+That progression—exploration → collaborative validation → standardization →
+automation—is the central analytical contribution documented by this
+repository.
+
 ## Background
 
 Business schools accredited by ACBSP (the field's accrediting body) must
@@ -23,9 +37,10 @@ couldn't reliably compare one year to the next.
 I led that standardization as committee chair: working with a
 department-wide committee over three annual cycles of evaluation and
 revision, we moved the program onto a common, rubric-based assessment
-scheme. This repo is the analyst-side counterpart I built solo — code
-that turns the raw exports that scheme produces into the standardized
-outcome tables accreditation requires.
+scheme. The measurement definitions were developed collaboratively; I
+independently implemented the analyst-side counterpart in this repository—code
+that turns the resulting raw exports into the standardized outcome tables
+accreditation requires.
 
 The scripted pipeline mattered most for continuity. Rubric-based,
 transparent assessment was a real cultural shift for the department, and
@@ -86,20 +101,69 @@ is the judgment calls inside each step, not the mechanics:
    using a mapping that ties specific rubric criteria to specific
    learning outcomes.
 
-## How the outcome categories emerged
+## The measurement framework emerged through iteration
 
-The mapping in step 3 above — which rubric criteria count toward which
-PLO — wasn't decided once and frozen. The repo's data schema
-(`data/README.md`) documents two separate mapping columns for
-consecutive years (`internal_rubric_keys2019`, `internal_rubric_keys2020`):
-the criteria that were judged to represent a given outcome changed
-between cycles, as exploratory review of score distributions and rubric
-wording surfaced criteria that didn't cleanly represent what they were
-assumed to. That's the norm for this kind of project, not an exception:
-the measurement structure was as much an output of the analysis as the
-outcome numbers were, and keeping both years' mappings in the schema
-(rather than overwriting one with the other) preserves that history
-instead of hiding it.
+The mapping in step 3—which rubric criteria count toward which PLO—was
+not decided once and frozen. It emerged from a documented cycle of data
+inspection, provisional analysis, faculty review, and revision. The notebooks
+in [`archive/`](../archive/) preserve that reasoning trail; the
+[`archive/README.md`](../archive/README.md) provides a guided reading order.
+
+| Stage | Question being answered | Evidence in the archive | Lasting change |
+|---|---|---|---|
+| Diagnostic exploration | What patterns are visible, and which apparent patterns might instead be missing data, changing standards, or implementation differences? | [`note_inspecting_assessment_01.Rmd`](../archive/note_inspecting_assessment_01.Rmd) | Established three complementary views: trends, internal-versus-external comparison, and actual-versus-target differences. |
+| Discussion-ready analysis | How can the analysis support department decisions rather than just describe the dataset? | [`note_inspecting_assessment_02.Rmd`](../archive/note_inspecting_assessment_02.Rmd) and [`note_prepare_acbsp_tables.Rmd`](../archive/note_prepare_acbsp_tables.Rmd) | Replaced one-off plots with mapping-driven program reports that retained targets, sample sizes, and contextual notes. |
+| Collaborative review | Which specifications are wrong, which comparisons are useful, and what context is missing? | [`note_session1_feedback_01.Rmd`](../archive/note_session1_feedback_01.Rmd) | Corrected mappings, reorganized the presentation, added requested disaggregations, and identified source records requiring follow-up. |
+| Consolidation | Which exploratory rules are stable enough to become part of the reporting process? | [`note_annual-reports-02.Rmd`](../archive/note_annual-reports-02.Rmd) | Moved definitions into lookup tables and standardized aggregation from section to course to PLO. |
+| Cross-year stress test | Does the scheme still work when a new annual export uses different labels, identifiers, and rubric structures? | [`ay2020/note-prelim-01-test-data.Rmd`](../archive/ay2020/note-prelim-01-test-data.Rmd) and [`ay2020/note-prelim-02-process.Rmd`](../archive/ay2020/note-prelim-02-process.Rmd) | Generalized achievement scales, investigated duplicate identifiers, and separated recurring transformations from cases needing human review. |
+| Standardization | How should the next cycle preserve comparability without hiding real changes in instruments? | [`ay2021/note01-standardize-data.Rmd`](../archive/ay2021/note01-standardize-data.Rmd) | Defined canonical columns and reference tables while preserving year-specific mappings and exceptions. |
+
+### How I inspected the data
+
+The notebooks show a recurring analytical method rather than a sequence of
+unrelated cleanup tasks:
+
+1. **Inventory the raw vocabulary.** I inspected column names, sample rows,
+   distinct values, factor levels, and frequency tables before recoding them.
+2. **Restore assessment context.** I joined rubric rows to survey responses and
+   lookup tables so a score could be traced to a program, course, assignment,
+   criterion, and intended learning outcome.
+3. **Slice progressively.** When an aggregate looked unusual, I moved down
+   through course, assignment, rubric criterion, section, and student group to
+   locate the source of the difference.
+4. **Test the data contract.** I checked for missing mappings, duplicate or
+   reused identifiers, inconsistent labels, changed rubrics, incomplete
+   sections, and incompatible achievement scales.
+5. **Compare interpretations.** I examined time trends, internal and external
+   measures, results against targets, and different aggregation levels while
+   retaining sample size and qualitative context.
+6. **Validate with faculty.** Preliminary graphs and mockups were discussion
+   tools. Faculty supplied corrections and instructional explanations, and the
+   committee's priorities determined which comparisons and disaggregations
+   became part of the report.
+
+This method helped distinguish three fundamentally different explanations for
+an unusual result: a source-data error, a change in an assessment instrument or
+its implementation, or a potentially meaningful difference in student
+learning. Automating before resolving that distinction would have made the
+pipeline more consistent but not necessarily more valid.
+
+### How exploration became production code
+
+The transition is visible in the repository. The section aggregation,
+mapping, and disaggregation developed in
+[`note_annual-reports-02.Rmd`](../archive/note_annual-reports-02.Rmd) were
+subsequently extracted into
+[`R/report-internal-direct-2019.R`](../R/report-internal-direct-2019.R).
+Similarly, recurring decisions about scale values, criterion names, attributes,
+and missing records became explicit transformations and validation checks in
+[`R/int_read.R`](../R/int_read.R) and [`R/int_munge.R`](../R/int_munge.R).
+
+The data schema preserves separate mapping columns for consecutive years
+(`internal_rubric_keys2019` and `internal_rubric_keys2020`) rather than
+overwriting the earlier definition. This makes a substantive change to the
+measurement scheme visible instead of creating a false appearance of perfect
+comparability across cycles.
 
 ## Original project outputs
 
@@ -123,6 +187,17 @@ outcome rate per PLO against target — generated by
 using the same code path as the real report.
 
 ![Bar chart showing the share of students meeting each learning outcome, four bars against a 70% target line, generated from synthetic demonstration data](img/plo_outcomes_demo.png)
+
+## What the public version cannot demonstrate
+
+The synthetic dataset demonstrates the pipeline's behavior, validation rules,
+and output structure, but it cannot reproduce the real program-level findings
+or every historical edge case. The archived notebooks also depend in places on
+confidential files, historical paths, and older package behavior, so they are
+evidence of the analytical process rather than independently reproducible
+reports. One consolidation notebook refers to an earlier notebook in a
+separate project that is not included here; the archive therefore captures most,
+but not every step, in the code's early history.
 
 ## Reproducing this
 
@@ -148,6 +223,6 @@ data/synthetic/     Committed synthetic stand-in data
 data-raw/           Synthetic data generator
 docs/               This case study and its figure
 out/                Report outputs (gitignored, regenerated by the pipeline)
-archive/            Other years' exploratory notebooks and one-off scripts,
-                    kept for reference but not part of the current pipeline
+archive/            Exploratory notebooks and feedback records documenting
+                    how the measurement framework developed
 ```
